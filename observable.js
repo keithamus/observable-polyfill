@@ -1,6 +1,13 @@
 (() => {
-  if (typeof Observable !== "undefined") {
+  if (typeof globalThis.Observable !== "undefined") {
     return
+  }
+
+  function enumerate(obj, key, enumerable = true) {
+    Object.defineProperty(obj, key, {
+      ...Object.getOwnPropertyDescriptor(obj, key),
+      enumerable,
+    });
   }
 
   const noop = (() => {})
@@ -8,7 +15,7 @@
   const privateState = new WeakMap()
 
   class InternalObserver {
-    constructor({next, error, complete}) {
+    constructor({next, error, complete} = {}) {
       privateState.set(this, {next, error, complete})
     }
 
@@ -52,7 +59,7 @@
   }
 
   // https://wicg.github.io/observable/#observable-subscribe-to-an-observable
-  function subscribeTo(observable, observer, options) {
+  function subscribeTo(observable, observer, options = {}) {
     // 2. Let internal observer be a new internal observer.
     let internalObserver;
     
@@ -63,7 +70,7 @@
       // any value:
       internalObserver = new InternalObserver({ next: observer })
     // 4. If observer is a SubscriptionObserver 
-    } else if (!(observer instanceof InternalObserver)) {
+    } else if (observer && !(observer instanceof InternalObserver)) {
       // 4.1. If observer’s next exists, then set internal observer’s next
       // steps to these steps that take an any value:
       // 4.2. If observer’s error exists, then set internal observer’s error
@@ -72,7 +79,7 @@
       // complete steps to these steps:
       internalObserver = new InternalObserver(observer.next, observer.error, observer.complete)
     } else {
-      internalObserver = observer
+      internalObserver = observer || new InternalObserver()
     }
 
     // 5. Let subscriber be a new Subscriber, initialized as...
@@ -100,6 +107,9 @@
 
   // https://wicg.github.io/observable/#subscriber-api
   class Subscriber {
+    get [Symbol.toStringTag]() {
+      return 'Subscriber'
+    }
 
     constructor(internalObserver = null) {
       if (!(internalObserver instanceof InternalObserver)) {
@@ -114,6 +124,9 @@
 
     // https://wicg.github.io/observable/#dom-subscriber-next
     next(value) {
+      if (!(this instanceof Subscriber)) throw new TypeError('illegal invocation')
+      if (!arguments.length) throw new TypeError('too few arguments')
+
       // 1. If this's active is false, then return.
       if (!privateState.has(this)) return
 
@@ -123,6 +136,9 @@
 
     // https://wicg.github.io/observable/#dom-subscriber-error
     error(error) {
+      if (!(this instanceof Subscriber)) throw new TypeError('illegal invocation')
+      if (!arguments.length) throw new TypeError('too few arguments')
+
       // 1. If this's active is false, then return.
       if (!privateState.has(this)) throw error
 
@@ -137,10 +153,12 @@
 
     // https://wicg.github.io/observable/#dom-subscriber-complete
     complete() {
+      if (!(this instanceof Subscriber)) throw new TypeError('illegal invocation')
+
       // 1. If this's active is false, then return.
       if (!privateState.has(this)) throw error
 
-      let observer = privateState.get(this).complete
+      let observer = privateState.get(this).observer
 
       // 3. Close this.
       closeASubscription(this)
@@ -151,6 +169,8 @@
 
     // https://wicg.github.io/observable/#dom-subscriber-addteardown
     addTeardown(teardown) {
+      if (!(this instanceof Subscriber)) throw new TypeError('illegal invocation')
+
       if (typeof teardown != 'function') {
         throw new TypeError(`Parameter 1 is not of type 'Function'`)
       }
@@ -161,21 +181,35 @@
     }
 
     get active() {
+      if (!(this instanceof Subscriber)) throw new TypeError('illegal invocation')
+
       return privateState.has(this)
     }
 
     get signal() {
+      if (!(this instanceof Subscriber)) throw new TypeError('illegal invocation')
+
       if (!privateState.has(this)) {
         const controller = new AbortController()
         controller.abort()
         return controller.signal
       }
-      return privateState.get(this).signal
+      return privateState.get(this).subscriptionController.signal
     }
   }
 
+  enumerate(Subscriber.prototype, 'next')
+  enumerate(Subscriber.prototype, 'error')
+  enumerate(Subscriber.prototype, 'complete')
+  enumerate(Subscriber.prototype, 'addTeardown')
+  enumerate(Subscriber.prototype, 'active')
+  enumerate(Subscriber.prototype, 'signal')
+
   // https://wicg.github.io/observable/#observable-api
   class Observable {
+    get [Symbol.toStringTag]() {
+      return 'Observable'
+    }
 
     // https://wicg.github.io/observable/#dom-observable-observable
     constructor(subscriberCallback) {
@@ -304,13 +338,15 @@
     }
 
     // https://wicg.github.io/observable/#dom-observable-subscribe
-    subscribe(observer, options) {
+    subscribe(observer = null, options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       // 1. Subscribe to this given observer and options.
       subscribeTo(this, observer, options);
     }
 
     // https://pr-preview.s3.amazonaws.com/WICG/observable/pull/160.html#dom-observable-takeuntil
     takeUntil(value) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
       // 2. Let notifier be the result of converting value to an Observable.
@@ -357,6 +393,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-map
     map(mapper) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof mapper !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
@@ -400,6 +437,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-filter
     filter(predicate) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof predicate !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
@@ -443,6 +481,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-take
     take(amount) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
       // 2. Let observable be a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
@@ -480,6 +519,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-drop
     drop(amount) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
       // 2. Let observable be a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
@@ -514,6 +554,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-flatmap
     flatMap(mapper) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof mapper !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
@@ -557,11 +598,11 @@
             next(value) {
               // Run subscriber’s next() method, given the passed in value.
               subscriber.next(value)
-            }
+            },
             error(value) {
               // Run subscriber’s error() method, given the passed in error.
               subscriber.error(value)
-            }
+            },
             complete(value) {
               // 1. If queue is not empty, then:
               if (queue.length) {
@@ -621,6 +662,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-switchmap
     flatMap(mapper) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof mapper !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
@@ -664,11 +706,11 @@
             next(value) {
               // Run subscriber’s next() method, given the passed in value.
               subscriber.next(value)
-            }
+            },
             error(value) {
               // Run subscriber’s error() method, given the passed in error.
               subscriber.error(value)
-            }
+            },
             complete(value) {
               // 1. If outerSubscriptionHasCompleted is true, run subscriber’s complete() method.
               if (outerSubscriptionHasCompleted) subscriber.complete()
@@ -725,6 +767,7 @@
 
     // https://pr-preview.s3.amazonaws.com/WICG/observable/pull/153.html#dom-observable-finally
     finally(callback) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof callback !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
@@ -770,6 +813,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-toarray
     toArray(options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       let resolve, reject;
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)))
@@ -812,6 +856,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-foreach
     forEach(callback, options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof callback !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       let resolve, reject;
       // 1. Let p a new promise.
@@ -872,6 +917,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-every
     every(predicate, options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof predicate !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       let resolve, reject;
       // 1. Let p a new promise.
@@ -938,6 +984,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-first
     first(options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       let resolve, reject;
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)))
@@ -988,6 +1035,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-last
     last( options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       let resolve, reject;
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)))
@@ -1037,6 +1085,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-find
     every(predicate, options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof predicate !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       let resolve, reject;
       // 1. Let p a new promise.
@@ -1103,6 +1152,7 @@
 
     // https://wicg.github.io/observable/#dom-observable-some
     some(predicate, options = {}) {
+      if (!(this instanceof Observable)) throw new TypeError('illegal invocation')
       if (typeof predicate !== 'function') throw new TypeError(`Parameter 1 is not of type 'Function'`)
       let resolve, reject;
       // 1. Let p a new promise.
@@ -1174,7 +1224,19 @@
 
   }
 
-  globalThis.Observable = Observable
-  globalThis.Subscriber = Subscriber
+  enumerate(Observable.prototype, 'subscribe')
+
+  Object.defineProperties(globalThis, {
+    Observable: {
+      value: Observable,
+      configurable: true,
+      writable: true
+    },
+    Subscriber: {
+      value: Subscriber,
+      configurable: true,
+      writable: true
+    },
+  })
 
 })();
