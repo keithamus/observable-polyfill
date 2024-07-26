@@ -1,11 +1,13 @@
 {
   "name": "observable-polyfill",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "observable.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["observable"],
+  "keywords": [
+    "observable"
+  ],
   "author": "Keith Cirkel (https://keithcirke.co.uk)",
   "license": "MIT",
   "description": "A polyfill for the WICG Observable"
