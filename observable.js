@@ -1457,6 +1457,44 @@ function apply() {
       writable: true,
     },
   });
+
+  EventTarget.prototype.when = function(type, options = {}) {
+    // Step 1: If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+    if (globalThis.Window && this instanceof Window && !document?.isConnected) {
+      return; // Early return if Document isn’t fully active
+    }
+
+    // Step 2: Let event target be this.
+    const eventTarget = this;
+
+    // Step 3: Let observable be a new Observable, initialized with a subscribe callback.
+    return new Observable(subscriber => {
+      // Step 3.1: If event target is null, abort these steps.
+      if (!eventTarget) return;
+
+      // Step 3.2: If subscriber’s subscription controller’s signal is aborted, then return.
+      if (subscriber.signal.aborted) return;
+
+      // Step 3.3: Add an event listener with the following configuration:
+      // - type: type (passed as argument)
+      // - callback: A new Web IDL EventListener instance that invokes subscriber.next(event)
+      // - capture: options.capture (default false)
+      // - passive: options.passive (default undefined)
+      // - once: false (explicitly set per spec)
+      // - signal: subscriber.signal (for aborting the subscription)
+      const listener = event => {
+        // Observable event listener invoke algorithm: Run subscriber’s next() method with event.
+        subscriber.next(event);
+      };
+
+      eventTarget.addEventListener(type, listener, {
+        capture: options.capture || false,
+        passive: options.passive,
+        once: false, // Explicitly false as required by spec
+        signal: subscriber.signal
+      });
+    });
+  };
 }
 
 export { Observable, Subscriber, isSupported, apply };
