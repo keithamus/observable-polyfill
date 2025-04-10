@@ -311,7 +311,7 @@ const [Observable, Subscriber] = (() => {
                 // 5.1.5.2 Let nextRecord be IteratorStepValue(iterator).
                 try {
                   // 5.1.5.4. Run subscriber’s next() given nextRecord’s [[Value]].
-                  subscriber.next(iterator.next().vaue);
+                  subscriber.next(iterator.next().value);
                   // 5.1.5.3. If nextRecord is a throw completion then:
                 } catch (e) {
                   // 5.1.5.3.1. Run subscriber’s error() method, given nextRecord’s [[Value]].
@@ -823,7 +823,7 @@ const [Observable, Subscriber] = (() => {
     }
 
     // https://wicg.github.io/observable/#dom-observable-switchmap
-    flatMap(mapper) {
+    switchMap(mapper) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
       if (typeof mapper !== "function")
@@ -886,7 +886,7 @@ const [Observable, Subscriber] = (() => {
           // result of creating a dependent abort signal from the list
           // «activeInnerAbortController’s signal, subscriber’s subscription
           // controller's signal», using AbortSignal, and the current realm.
-          let dependantAbortController = new Abortcontroller();
+          let dependantAbortController = new AbortController();
           subscriber.signal.addEventListener(
             "abort",
             () => dependantAbortController.abort(),
@@ -1039,7 +1039,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let visitor callback controller be a new AbortController.
-      let visitorCallbackController = new AbortContoller();
+      let visitorCallbackController = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «visitor
       // callback controller’s signal, options’s signal if non-null», using
@@ -1107,7 +1107,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
@@ -1179,7 +1179,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
@@ -1280,7 +1280,7 @@ const [Observable, Subscriber] = (() => {
     }
 
     // https://wicg.github.io/observable/#dom-observable-find
-    every(predicate, options = {}) {
+    find(predicate, options = {}) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
       if (typeof predicate !== "function")
@@ -1289,7 +1289,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
@@ -1363,7 +1363,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
