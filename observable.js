@@ -304,14 +304,18 @@ const [Observable, Subscriber] = (() => {
             // 5.1.1 Let iteratorRecord be GetIteratorFromMethod(value, %Symbol.asyncIterator%).
             try {
               // 5.1.3 Let iterator be iteratorRecord’s [[Value]].
-              const iterator = value[Symbol.asyncIterator]();
+              const iterator = value[Symbol.iterator]();
               // 5.1.4 Repeat:
-              // 5.1.5. If iterator’s [[Done]] is true, then:
-              while (!iterator.done) {
+              while(true) {
+                const nextRecord = iterator.next();
+                // 5.1.5. If iterator’s [[Done]] is true, then:
+                if(nextRecord.done) {
+                  break;
+                }
                 // 5.1.5.2 Let nextRecord be IteratorStepValue(iterator).
                 try {
                   // 5.1.5.4. Run subscriber’s next() given nextRecord’s [[Value]].
-                  subscriber.next(iterator.next().vaue);
+                  subscriber.next(nextRecord.value);
                   // 5.1.5.3. If nextRecord is a throw completion then:
                 } catch (e) {
                   // 5.1.5.3.1. Run subscriber’s error() method, given nextRecord’s [[Value]].
@@ -456,6 +460,140 @@ const [Observable, Subscriber] = (() => {
         subscribeTo(sourceObservable, sourceObserver, options);
       });
     }
+
+    // https://wicg.github.io/observable/#dom-observable-inspect
+    inspect(inspectorUnion = {}) {
+      const sourceObservable = this;
+
+      return new Observable(subscriber => {
+        // 1: Let subscribe callback be a `VoidFunction`-or-null, initially null.
+        let subscribeCallback = null;
+        // 2: Let next callback be a `ObservableSubscriptionCallback`-or-null, initially null.
+        let nextCallback = null;
+        // 3: Let error callback be a `ObservableSubscriptionCallback`-or-null, initially null.
+        let errorCallback = null;
+        // 4: Let complete callback be a `VoidFunction`-or-null, initially null.
+        let completeCallback = null;
+        // 5: Let abort callback be a `ObservableInspectorAbortHandler`-or-null, initially null.
+        let abortCallback = null;
+
+        // 6: Process inspectorUnion as follows:
+        if (typeof inspectorUnion === 'function') {
+          // If inspectorUnion is an `ObservableSubscriptionCallback`
+          // 6.1: Set next callback to inspectorUnion.
+          nextCallback = inspectorUnion;
+        } else if (inspectorUnion && typeof inspectorUnion === 'object') {
+          // If inspectorUnion is an `ObservableInspector`
+          // 6.1: If `subscribe` exists in inspectorUnion, then set subscribe callback to it.
+          if ('subscribe' in inspectorUnion) subscribeCallback = inspectorUnion.subscribe;
+          // 6.2: If `next` exists in inspectorUnion, then set next callback to it.
+          if ('next' in inspectorUnion) nextCallback = inspectorUnion.next;
+          // 6.3: If `error` exists in inspectorUnion, then set error callback to it.
+          if ('error' in inspectorUnion) errorCallback = inspectorUnion.error;
+          // 6.4: If `complete` exists in inspectorUnion, then set complete callback to it.
+          if ('complete' in inspectorUnion) completeCallback = inspectorUnion.complete;
+          // 6.5: If `abort` exists in inspectorUnion, then set abort callback to it.
+          if ('abort' in inspectorUnion) abortCallback = inspectorUnion.abort;
+        }
+
+        // 7: Let sourceObservable be this.
+        // (Already done at top of function)
+
+        // 8: Let observable be a new `Observable` whose subscribe callback is an algorithm that takes a `Subscriber` subscriber and does the following:
+        // (This is the current function)
+
+        // 8.1: If subscribe callback is not null, then invoke it.
+        if (subscribeCallback !== null) {
+          try {
+            subscribeCallback();
+          } catch (e) {
+            // If an exception E was thrown, then run subscriber’s `error()` method, given E, and abort these steps.
+            subscriber.error(e);
+            return;
+          }
+        }
+
+        // 8.2: If abort callback is not null, then add the following abort algorithm to subscriber’s subscription controller’s signal:
+        if (abortCallback !== null) {
+          subscriber.signal.addEventListener('abort', () => {
+            // 8.2.1: Invoke abort callback with subscriber’s subscription controller’s signal’s abort reason.
+            try {
+              abortCallback(subscriber.signal.reason);
+            } catch (e) {
+              // If an exception E was thrown, then report the exception E.
+              console.error(e);
+            }
+          }, { once: true });
+        }
+
+        // 8.3: Let sourceObserver be a new internal observer, initialized as follows:
+        const sourceObserver = {
+          next(value) {
+            // next steps
+            // 8.3.next.1: If next callback is not null, then invoke next callback with the passed in value.
+            if (nextCallback !== null) {
+              try {
+                nextCallback(value);
+              } catch (e) {
+                // If an exception E was thrown, then:
+                // 8.3.next.1.1: Remove abort callback from subscriber’s subscription controller’s signal.
+                if (abortCallback !== null) {
+                  subscriber.signal.removeEventListener('abort', abortCallback);
+                }
+                // 8.3.next.1.2: Run subscriber’s `error()` method, given E, and abort these steps.
+                subscriber.error(e);
+                return;
+              }
+            }
+            // 8.3.next.2: Run subscriber’s `next()` method with the passed in value.
+            subscriber.next(value);
+          },
+          error(error) {
+            // error steps
+            // 8.3.error.1: Remove abort callback from subscriber’s subscription controller’s signal.
+            if (abortCallback !== null) {
+              subscriber.signal.removeEventListener('abort', abortCallback);
+            }
+            // 8.3.error.2: If error callback is not null, then invoke error callback given the passed in error.
+            if (errorCallback !== null) {
+              try {
+                errorCallback(error);
+              } catch (e) {
+                // If an exception E was thrown, then run subscriber’s `error()` method, given E, and abort these steps.
+                subscriber.error(e);
+                return;
+              }
+            }
+            // 8.3.error.3: Run subscriber’s `error()` method, given the passed in error.
+            subscriber.error(error);
+          },
+          complete() {
+            // complete steps
+            // 8.3.complete.1: Remove abort callback from subscriber’s subscription controller’s signal.
+            if (abortCallback !== null) {
+              subscriber.signal.removeEventListener('abort', abortCallback);
+            }
+            // 8.3.complete.2: If complete callback is not null, then invoke complete callback.
+            if (completeCallback !== null) {
+              try {
+                completeCallback();
+              } catch (e) {
+                // If an exception E was thrown, then run subscriber’s `error()` method, given E, and abort these steps.
+                subscriber.error(e);
+                return;
+              }
+            }
+            // 8.3.complete.3: Run subscriber’s `complete()` method.
+            subscriber.complete();
+          }
+        };
+
+        // 8.4: Let options be a new `SubscribeOptions` whose `signal` is subscriber’s subscription controller’s signal.
+        const options = { signal: subscriber.signal };
+        // 8.5: Subscribe to sourceObservable given sourceObserver and options.
+        sourceObservable.subscribe(sourceObserver, options);
+      });
+    };
 
     // https://wicg.github.io/observable/#dom-observable-filter
     filter(predicate) {
@@ -689,7 +827,7 @@ const [Observable, Subscriber] = (() => {
     }
 
     // https://wicg.github.io/observable/#dom-observable-switchmap
-    flatMap(mapper) {
+    switchMap(mapper) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
       if (typeof mapper !== "function")
@@ -752,7 +890,7 @@ const [Observable, Subscriber] = (() => {
           // result of creating a dependent abort signal from the list
           // «activeInnerAbortController’s signal, subscriber’s subscription
           // controller's signal», using AbortSignal, and the current realm.
-          let dependantAbortController = new Abortcontroller();
+          let dependantAbortController = new AbortController();
           subscriber.signal.addEventListener(
             "abort",
             () => dependantAbortController.abort(),
@@ -905,7 +1043,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let visitor callback controller be a new AbortController.
-      let visitorCallbackController = new AbortContoller();
+      let visitorCallbackController = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «visitor
       // callback controller’s signal, options’s signal if non-null», using
@@ -973,7 +1111,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
@@ -1045,7 +1183,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
@@ -1146,7 +1284,7 @@ const [Observable, Subscriber] = (() => {
     }
 
     // https://wicg.github.io/observable/#dom-observable-find
-    every(predicate, options = {}) {
+    find(predicate, options = {}) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
       if (typeof predicate !== "function")
@@ -1155,7 +1293,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
@@ -1229,7 +1367,7 @@ const [Observable, Subscriber] = (() => {
       // 1. Let p a new promise.
       let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
       // 2. Let controller be a new AbortController.
-      let controller = new AbortContoller();
+      let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
       // result of creating a dependent abort signal from the list «controller’s
       // signal, options’s signal if non-null», using AbortSignal, and the
@@ -1323,6 +1461,45 @@ function apply() {
       writable: true,
     },
   });
+
+  EventTarget.prototype.when = function(type, options = {}) {
+    // Step 1: If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+    if (globalThis.Window && this instanceof Window && !document?.isConnected) {
+      return; // Early return if Document isn’t fully active
+    }
+
+    // Step 2: Let event target be this.
+    const eventTarget = this;
+
+    // Step 3: Let observable be a new Observable, initialized with a subscribe callback.
+    return new Observable(subscriber => {
+      // Step 3.1: If event target is null, abort these steps.
+      if (!eventTarget) return;
+
+      // Step 3.2: If subscriber’s subscription controller’s signal is aborted, then return.
+      if (subscriber.signal.aborted) return;
+
+      // Step 3.3: Add an event listener with the following configuration:
+      // - type: type (passed as argument)
+      // - callback: A new Web IDL EventListener instance that invokes subscriber.next(event)
+      // - capture: options.capture (default false)
+      // - passive: options.passive (default undefined)
+      // - once: false (explicitly set per spec)
+      // - signal: subscriber.signal (for aborting the subscription)
+      const listener = event => {
+        // Observable event listener invoke algorithm: Run subscriber’s next() method with event.
+        subscriber.next(event);
+      };
+
+      eventTarget.addEventListener(type, listener, {
+        capture: options.capture || false,
+        passive: options.passive,
+        once: false, // Explicitly false as required by spec
+        signal: subscriber.signal
+      });
+    });
+  };
 }
 
 export { Observable, Subscriber, isSupported, apply };
+
