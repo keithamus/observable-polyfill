@@ -1,14 +1,48 @@
 {
   "name": "observable-polyfill",
-  "version": "0.0.3",
-  "main": "observable.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "version": "0.0.0-development",
+  "description": "A polyfill for the WICG Observable",
   "keywords": [
     "observable"
   ],
-  "author": "Keith Cirkel (https://keithcirke.co.uk)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keithamus/observable-polyfill.git"
+  },
   "license": "MIT",
-  "description": "A polyfill for the WICG Observable"
+  "author": "Keith Cirkel (https://keithcirkel.co.uk)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./observable.d.ts",
+      "import": "./index.js",
+      "browser": "./observable.min.js",
+      "require": "./observable.min.js"
+    },
+    "./fn": {
+      "types": "./index-fn.d.ts",
+      "import": "./observable.js"
+    }
+  },
+  "main": "index.js",
+  "types": "observable.d.ts",
+  "typesVersions": {
+    "*": {
+      "fn": [
+        "./index-fn.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "*.d.ts",
+    "*.js"
+  ],
+  "scripts": {
+    "minify": "esbuild --bundle --minify index.js > observable.min.js",
+    "prepublishOnly": "npm run minify",
+    "test": "echo TODO! Run ./wpt serve --inject-script=../observables-polyfill/observable.js for now."
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2"
+  }
 }

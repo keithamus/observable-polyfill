@@ -306,10 +306,10 @@ const [Observable, Subscriber] = (() => {
               // 5.1.3 Let iterator be iteratorRecord’s [[Value]].
               const iterator = value[Symbol.iterator]();
               // 5.1.4 Repeat:
-              while(true) {
+              while (true) {
                 const nextRecord = iterator.next();
                 // 5.1.5. If iterator’s [[Done]] is true, then:
-                if(nextRecord.done) {
+                if (nextRecord.done) {
                   break;
                 }
                 // 5.1.5.2 Let nextRecord be IteratorStepValue(iterator).
@@ -465,7 +465,7 @@ const [Observable, Subscriber] = (() => {
     inspect(inspectorUnion = {}) {
       const sourceObservable = this;
 
-      return new Observable(subscriber => {
+      return new Observable((subscriber) => {
         // 1: Let subscribe callback be a `VoidFunction`-or-null, initially null.
         let subscribeCallback = null;
         // 2: Let next callback be a `ObservableSubscriptionCallback`-or-null, initially null.
@@ -478,22 +478,24 @@ const [Observable, Subscriber] = (() => {
         let abortCallback = null;
 
         // 6: Process inspectorUnion as follows:
-        if (typeof inspectorUnion === 'function') {
+        if (typeof inspectorUnion === "function") {
           // If inspectorUnion is an `ObservableSubscriptionCallback`
           // 6.1: Set next callback to inspectorUnion.
           nextCallback = inspectorUnion;
-        } else if (inspectorUnion && typeof inspectorUnion === 'object') {
+        } else if (inspectorUnion && typeof inspectorUnion === "object") {
           // If inspectorUnion is an `ObservableInspector`
           // 6.1: If `subscribe` exists in inspectorUnion, then set subscribe callback to it.
-          if ('subscribe' in inspectorUnion) subscribeCallback = inspectorUnion.subscribe;
+          if ("subscribe" in inspectorUnion)
+            subscribeCallback = inspectorUnion.subscribe;
           // 6.2: If `next` exists in inspectorUnion, then set next callback to it.
-          if ('next' in inspectorUnion) nextCallback = inspectorUnion.next;
+          if ("next" in inspectorUnion) nextCallback = inspectorUnion.next;
           // 6.3: If `error` exists in inspectorUnion, then set error callback to it.
-          if ('error' in inspectorUnion) errorCallback = inspectorUnion.error;
+          if ("error" in inspectorUnion) errorCallback = inspectorUnion.error;
           // 6.4: If `complete` exists in inspectorUnion, then set complete callback to it.
-          if ('complete' in inspectorUnion) completeCallback = inspectorUnion.complete;
+          if ("complete" in inspectorUnion)
+            completeCallback = inspectorUnion.complete;
           // 6.5: If `abort` exists in inspectorUnion, then set abort callback to it.
-          if ('abort' in inspectorUnion) abortCallback = inspectorUnion.abort;
+          if ("abort" in inspectorUnion) abortCallback = inspectorUnion.abort;
         }
 
         // 7: Let sourceObservable be this.
@@ -515,15 +517,19 @@ const [Observable, Subscriber] = (() => {
 
         // 8.2: If abort callback is not null, then add the following abort algorithm to subscriber’s subscription controller’s signal:
         if (abortCallback !== null) {
-          subscriber.signal.addEventListener('abort', () => {
-            // 8.2.1: Invoke abort callback with subscriber’s subscription controller’s signal’s abort reason.
-            try {
-              abortCallback(subscriber.signal.reason);
-            } catch (e) {
-              // If an exception E was thrown, then report the exception E.
-              console.error(e);
-            }
-          }, { once: true });
+          subscriber.signal.addEventListener(
+            "abort",
+            () => {
+              // 8.2.1: Invoke abort callback with subscriber’s subscription controller’s signal’s abort reason.
+              try {
+                abortCallback(subscriber.signal.reason);
+              } catch (e) {
+                // If an exception E was thrown, then report the exception E.
+                console.error(e);
+              }
+            },
+            { once: true },
+          );
         }
 
         // 8.3: Let sourceObserver be a new internal observer, initialized as follows:
@@ -538,7 +544,7 @@ const [Observable, Subscriber] = (() => {
                 // If an exception E was thrown, then:
                 // 8.3.next.1.1: Remove abort callback from subscriber’s subscription controller’s signal.
                 if (abortCallback !== null) {
-                  subscriber.signal.removeEventListener('abort', abortCallback);
+                  subscriber.signal.removeEventListener("abort", abortCallback);
                 }
                 // 8.3.next.1.2: Run subscriber’s `error()` method, given E, and abort these steps.
                 subscriber.error(e);
@@ -552,7 +558,7 @@ const [Observable, Subscriber] = (() => {
             // error steps
             // 8.3.error.1: Remove abort callback from subscriber’s subscription controller’s signal.
             if (abortCallback !== null) {
-              subscriber.signal.removeEventListener('abort', abortCallback);
+              subscriber.signal.removeEventListener("abort", abortCallback);
             }
             // 8.3.error.2: If error callback is not null, then invoke error callback given the passed in error.
             if (errorCallback !== null) {
@@ -571,7 +577,7 @@ const [Observable, Subscriber] = (() => {
             // complete steps
             // 8.3.complete.1: Remove abort callback from subscriber’s subscription controller’s signal.
             if (abortCallback !== null) {
-              subscriber.signal.removeEventListener('abort', abortCallback);
+              subscriber.signal.removeEventListener("abort", abortCallback);
             }
             // 8.3.complete.2: If complete callback is not null, then invoke complete callback.
             if (completeCallback !== null) {
@@ -585,7 +591,7 @@ const [Observable, Subscriber] = (() => {
             }
             // 8.3.complete.3: Run subscriber’s `complete()` method.
             subscriber.complete();
-          }
+          },
         };
 
         // 8.4: Let options be a new `SubscribeOptions` whose `signal` is subscriber’s subscription controller’s signal.
@@ -593,7 +599,7 @@ const [Observable, Subscriber] = (() => {
         // 8.5: Subscribe to sourceObservable given sourceObserver and options.
         sourceObservable.subscribe(sourceObserver, options);
       });
-    };
+    }
 
     // https://wicg.github.io/observable/#dom-observable-filter
     filter(predicate) {
@@ -1443,9 +1449,11 @@ const [Observable, Subscriber] = (() => {
 })();
 
 function isSupported() {
-  if (typeof globalThis.Observable !== "undefined") {
-    return;
-  }
+  return typeof globalThis.Observable === "function";
+}
+
+function isPolyfilled() {
+  return globalThis.Observable === Observable;
 }
 
 function apply() {
@@ -1462,7 +1470,7 @@ function apply() {
     },
   });
 
-  EventTarget.prototype.when = function(type, options = {}) {
+  EventTarget.prototype.when = function (type, options = {}) {
     // Step 1: If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
     if (globalThis.Window && this instanceof Window && !document?.isConnected) {
       return; // Early return if Document isn’t fully active
@@ -1472,7 +1480,7 @@ function apply() {
     const eventTarget = this;
 
     // Step 3: Let observable be a new Observable, initialized with a subscribe callback.
-    return new Observable(subscriber => {
+    return new Observable((subscriber) => {
       // Step 3.1: If event target is null, abort these steps.
       if (!eventTarget) return;
 
@@ -1486,7 +1494,7 @@ function apply() {
       // - passive: options.passive (default undefined)
       // - once: false (explicitly set per spec)
       // - signal: subscriber.signal (for aborting the subscription)
-      const listener = event => {
+      const listener = (event) => {
         // Observable event listener invoke algorithm: Run subscriber’s next() method with event.
         subscriber.next(event);
       };
@@ -1495,11 +1503,10 @@ function apply() {
         capture: options.capture || false,
         passive: options.passive,
         once: false, // Explicitly false as required by spec
-        signal: subscriber.signal
+        signal: subscriber.signal,
       });
     });
   };
 }
 
-export { Observable, Subscriber, isSupported, apply };
-
+export { Observable, Subscriber, isPolyfilled, isSupported, apply };
