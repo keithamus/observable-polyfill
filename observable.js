@@ -306,12 +306,16 @@ const [Observable, Subscriber] = (() => {
               // 5.1.3 Let iterator be iteratorRecord’s [[Value]].
               const iterator = value[Symbol.iterator]();
               // 5.1.4 Repeat:
-              // 5.1.5. If iterator’s [[Done]] is true, then:
-              while (!iterator.done) {
+              while(true) {
+                const nextRecord = iterator.next();
+                // 5.1.5. If iterator’s [[Done]] is true, then:
+                if(nextRecord.done) {
+                  break;
+                }
                 // 5.1.5.2 Let nextRecord be IteratorStepValue(iterator).
                 try {
                   // 5.1.5.4. Run subscriber’s next() given nextRecord’s [[Value]].
-                  subscriber.next(iterator.next().vaue);
+                  subscriber.next(nextRecord.value);
                   // 5.1.5.3. If nextRecord is a throw completion then:
                 } catch (e) {
                   // 5.1.5.3.1. Run subscriber’s error() method, given nextRecord’s [[Value]].
