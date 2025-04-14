@@ -629,7 +629,9 @@ const [Observable, Subscriber] = (() => {
             // 3. Set idx to idx + 1.
             idx += 1;
             // 4. If matches is true, then run subscriber’s next() method, given value.
-            if (matches) subscriber.next(mappedValue);
+            if (matches) {
+              subscriber.next(value);
+            }
           },
           error(value) {
             // Run subscriber’s error() method, given the passed in error.
