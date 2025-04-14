@@ -367,49 +367,56 @@ const [Observable, Subscriber] = (() => {
       subscribeTo(this, observer, options);
     }
 
-    // https://pr-preview.s3.amazonaws.com/WICG/observable/pull/160.html#dom-observable-takeuntil
+    // https://wicg.github.io/observable/#dom-observable-takeuntil
     takeUntil(value) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
+
       // 1. Let sourceObservable be this.
       let sourceObservable = this;
+
       // 2. Let notifier be the result of converting value to an Observable.
-      let notifier = Observable.from(this);
+      let notifier = Observable.from(value);
+
       // 3. Let observable be a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
-      // 4. return observable
       return new Observable((subscriber) => {
         // 3.1. Let notifierObserver be a new internal observer, initialized as follows:
         const notifierObserver = new InternalObserver({
+          // 3.1.1. For the next callback, run subscriber’s complete() method.
           next() {
-            // Run subscriber’s complete() method.
             subscriber.complete();
           },
+          // 3.1.2. For the error callback, run subscriber’s complete() method.
           error() {
-            // Run subscriber’s complete() method.
             subscriber.complete();
           },
         });
+
         // 3.2. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller's signal.
         let options = { signal: subscriber.signal };
-        // 3.3 Subscribe to notifier given notifierObserver and options.
+
+        // 3.3. Subscribe to notifier given notifierObserver and options.
         subscribeTo(notifier, notifierObserver, options);
+
         // 3.4. If subscriber’s active is false, then return.
         if (!subscriber.active) return;
+
         // 3.5. Let sourceObserver be a new internal observer, initialized as follows:
         let sourceObserver = new InternalObserver({
+          // 3.5.1. For the next callback, run subscriber’s next() method, given the passed in value.
           next(value) {
-            // Run subscriber’s next() method, given the passed in value.
             subscriber.next(value);
           },
+          // 3.5.2. For the error callback, run subscriber’s error() method, given the passed in error.
           error(value) {
-            // Run subscriber’s error() method, given the passed in error.
             subscriber.error(value);
           },
+          // 3.5.3. For the complete callback, run subscriber’s complete() method.
           complete() {
-            // Run subscriber’s complete() method.
             subscriber.complete();
           },
         });
+
         // 3.6. Subscribe to sourceObservable given sourceObserver and options.
         subscribeTo(sourceObservable, sourceObserver, options);
       });
