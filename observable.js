@@ -1447,9 +1447,88 @@ const [Observable, Subscriber] = (() => {
     }
 
     // https://wicg.github.io/observable/#dom-observable-reduce
-    // reduce(reducer, initialValue, options) {
-    //   throw new Error('todo')
-    // }
+    reduce(reducer, initialValue, options) {
+      if (!(this instanceof Observable))
+        throw new TypeError("illegal invocation");
+      if (typeof reducer !== "function")
+        throw new TypeError(`Parameter 1 is not of type 'Function'`);
+      let resolve, reject;
+      // 1. Let p a new promise.
+      const p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      // 2. Let controller be a new AbortController.
+      const controller = new AbortController();
+      // 3 Let internal options be a new SubscribeOptions whose signal is the result of creating a dependent
+      // abort signal from the list «controller’s signal, options’s signal if non-null», using AbortSignal, and the current realm.
+      const dependantAbortController = new AbortController();
+      controller.signal.addEventListener("abort", (e) =>
+        dependantAbortController.abort(e.reason),
+      );
+      if (options?.signal)
+        options.signal.addEventListener("abort", (e) =>
+          dependantAbortController.abort(e.reason),
+        );
+      const internalOptions = { signal: dependantAbortController.signal };
+      // 4. If internal options’s signal is aborted, then:
+      if (internalOptions.signal.aborted) {
+        // 4.1 Reject p with internal options’s signal’s abort reason.
+        reject(internalOptions.signal.reason);
+        // 4.2 Return p.
+        return p;
+      }
+      // 5. Add the following abort algorithm to internal options’s signal:
+      internalOptions.signal.addEventListener('abort', () => {
+        // 5.1 Reject p with internal options’s signal’s abort reason.
+        reject(internalOptions.signal.reason);
+      }, { once: true });
+      // 6. Let idx be an unsigned long long, initially 0.
+      let idx = 0;
+      // 7. Let accumulator be initialValue if it is given, and uninitialized otherwise.
+      let accumulator = initialValue;
+      // 8. Let observer be a new internal observer, initialized as follows:
+      const observer = new InternalObserver({
+        // next steps
+        next(value) {
+          // 8.1 If accumulator is uninitialized (meaning no initialValue was passed in), then set accumulator to the passed in value, set idx to idx + 1, and abort these steps.
+          if (accumulator === undefined) {
+            accumulator = value;
+            idx++;
+            return;
+          }
+          try {
+            // 8.2 Invoke reducer with «accumulator as accumulator, the passed in value as currentValue, idx as index» and "rethrow". Let result be the returned value.
+            const result = reducer(accumulator, value, idx);
+            // 8.3 Set idx to idx + 1.
+            idx++;
+            // 8.4 Set accumulator to result.
+            accumulator = result;
+          } catch (e) {
+            // 8.2-error If an exception E was thrown, then reject p with E, and signal abort controller with E.
+            reject(e);
+            controller.abort(e);
+            return;
+          }
+        },
+        // error steps
+        error(error) {
+          // Reject p with the passed in error.
+          reject(error);
+        },
+        // complete steps
+        complete() {
+          // 1. If accumulator is not "unset", then resolve p with accumulator.
+          // Otherwise, reject p with a TypeError.
+          if (accumulator !== undefined) {
+            resolve(accumulator);
+          } else {
+            reject(new TypeError('no initial value provided and no values emitted'));
+          }
+        },
+      });
+      // 9. Subscribe to this given observer and internal options.
+      subscribeTo(this, observer, internalOptions);
+      // 10. Return p.
+      return p;
+    }
   }
 
   enumerate(Observable.prototype, "subscribe");
