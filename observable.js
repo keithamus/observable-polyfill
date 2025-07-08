@@ -1259,14 +1259,14 @@ const [Observable, Subscriber] = (() => {
         // 2.1. If options’s signal is aborted, then:
         if (options.signal.aborted) {
           // 2.1.1 Reject p with options’s signal's abort reason.
-          reject(internalOptions.signal.reason);
+          reject(options.signal.reason);
           // 2.1.2 Return p.
           return p;
         }
         // 2.2. Add the following abort algorithm to options’s signal:
         options.signal.addEventListener("abort", (e) => {
           // Reject p with internal options’s signal's abort reason.
-          reject(e.reason);
+          reject(options.signal.reason);
         });
       }
       // 3. Let lastValue be an any-or-null, initially null.
@@ -1288,8 +1288,8 @@ const [Observable, Subscriber] = (() => {
         complete() {
           // 1. If hasLastValue is true, resolve p with lastValue.
           if (hasLastValue) resolve(lastValue);
-          // 2. Otherwise, resolve p with undefined.
-          else resolve();
+          // 2. Otherwise, reject p with a new RangeError.
+          else reject(new RangeError('No values in Observable'));
         },
       });
       // 5. Subscribe to this given observer and options.
