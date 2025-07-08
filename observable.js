@@ -677,7 +677,7 @@ const [Observable, Subscriber] = (() => {
             // 2. Decrement remaining.
             remaining -= 1;
             // 3. If remaining is 0, then run subscriber’s complete() method.
-            subscriber.complete();
+            if (remaining == 0) subscriber.complete();
           },
           error(value) {
             // Run subscriber’s error() method, given the passed in error.
