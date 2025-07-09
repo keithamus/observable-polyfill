@@ -204,7 +204,7 @@ const [Observable, Subscriber] = (() => {
 
       if (!privateState.has(this)) {
         const controller = new AbortController();
-        controller.abort();
+        controller.abort(); // TODO we need the reason here - how to get it without subscriptionController?
         return controller.signal;
       }
       return privateState.get(this).subscriptionController.signal;
@@ -470,47 +470,40 @@ const [Observable, Subscriber] = (() => {
 
     // https://wicg.github.io/observable/#dom-observable-inspect
     inspect(inspectorUnion = {}) {
+      // 1: Let subscribe callback be a `VoidFunction`-or-null, initially null.
+      let subscribeCallback = null;
+      // 2: Let next callback be a `ObservableSubscriptionCallback`-or-null, initially null.
+      let nextCallback = null;
+      // 3: Let error callback be a `ObservableSubscriptionCallback`-or-null, initially null.
+      let errorCallback = null;
+      // 4: Let complete callback be a `VoidFunction`-or-null, initially null.
+      let completeCallback = null;
+      // 5: Let abort callback be a `ObservableInspectorAbortHandler`-or-null, initially null.
+      let abortCallback = null;
+
+      // 6: Process inspectorUnion as follows:
+      if (typeof inspectorUnion === "function") {
+        // If inspectorUnion is an `ObservableSubscriptionCallback`
+        // 6.1: Set next callback to inspectorUnion.
+        nextCallback = inspectorUnion;
+      } else if (inspectorUnion && typeof inspectorUnion === "object") {
+        // If inspectorUnion is an `ObservableInspector`
+        // 6.1: If `subscribe` exists in inspectorUnion, then set subscribe callback to it.
+        if ("subscribe" in inspectorUnion) subscribeCallback = inspectorUnion.subscribe;
+        // 6.2: If `next` exists in inspectorUnion, then set next callback to it.
+        if ("next" in inspectorUnion) nextCallback = inspectorUnion.next;
+        // 6.3: If `error` exists in inspectorUnion, then set error callback to it.
+        if ("error" in inspectorUnion) errorCallback = inspectorUnion.error;
+        // 6.4: If `complete` exists in inspectorUnion, then set complete callback to it.
+        if ("complete" in inspectorUnion) completeCallback = inspectorUnion.complete;
+        // 6.5: If `abort` exists in inspectorUnion, then set abort callback to it.
+        if ("abort" in inspectorUnion) abortCallback = inspectorUnion.abort;
+      }
+
+      // 7: Let sourceObservable be this.
       const sourceObservable = this;
-
+      // 8: Let observable be a new `Observable` whose subscribe callback is an algorithm that takes a `Subscriber` subscriber and does the following:
       return new Observable((subscriber) => {
-        // 1: Let subscribe callback be a `VoidFunction`-or-null, initially null.
-        let subscribeCallback = null;
-        // 2: Let next callback be a `ObservableSubscriptionCallback`-or-null, initially null.
-        let nextCallback = null;
-        // 3: Let error callback be a `ObservableSubscriptionCallback`-or-null, initially null.
-        let errorCallback = null;
-        // 4: Let complete callback be a `VoidFunction`-or-null, initially null.
-        let completeCallback = null;
-        // 5: Let abort callback be a `ObservableInspectorAbortHandler`-or-null, initially null.
-        let abortCallback = null;
-
-        // 6: Process inspectorUnion as follows:
-        if (typeof inspectorUnion === "function") {
-          // If inspectorUnion is an `ObservableSubscriptionCallback`
-          // 6.1: Set next callback to inspectorUnion.
-          nextCallback = inspectorUnion;
-        } else if (inspectorUnion && typeof inspectorUnion === "object") {
-          // If inspectorUnion is an `ObservableInspector`
-          // 6.1: If `subscribe` exists in inspectorUnion, then set subscribe callback to it.
-          if ("subscribe" in inspectorUnion)
-            subscribeCallback = inspectorUnion.subscribe;
-          // 6.2: If `next` exists in inspectorUnion, then set next callback to it.
-          if ("next" in inspectorUnion) nextCallback = inspectorUnion.next;
-          // 6.3: If `error` exists in inspectorUnion, then set error callback to it.
-          if ("error" in inspectorUnion) errorCallback = inspectorUnion.error;
-          // 6.4: If `complete` exists in inspectorUnion, then set complete callback to it.
-          if ("complete" in inspectorUnion)
-            completeCallback = inspectorUnion.complete;
-          // 6.5: If `abort` exists in inspectorUnion, then set abort callback to it.
-          if ("abort" in inspectorUnion) abortCallback = inspectorUnion.abort;
-        }
-
-        // 7: Let sourceObservable be this.
-        // (Already done at top of function)
-
-        // 8: Let observable be a new `Observable` whose subscribe callback is an algorithm that takes a `Subscriber` subscriber and does the following:
-        // (This is the current function)
-
         // 8.1: If subscribe callback is not null, then invoke it.
         if (subscribeCallback !== null) {
           try {
@@ -523,24 +516,21 @@ const [Observable, Subscriber] = (() => {
         }
 
         // 8.2: If abort callback is not null, then add the following abort algorithm to subscriber’s subscription controller’s signal:
-        if (abortCallback !== null) {
-          subscriber.signal.addEventListener(
-            "abort",
-            () => {
-              // 8.2.1: Invoke abort callback with subscriber’s subscription controller’s signal’s abort reason.
-              try {
-                abortCallback(subscriber.signal.reason);
-              } catch (e) {
-                // If an exception E was thrown, then report the exception E.
-                console.error(e);
-              }
-            },
-            { once: true },
-          );
-        }
+        const abortCallbackWrapped = () => {
+          // 8.2.1: Invoke abort callback with subscriber’s subscription controller’s signal’s abort reason.
+          try {
+            if (abortCallback !== null) {
+              abortCallback(subscriber.signal.reason);
+            }
+          } catch (e) {
+            // If an exception E was thrown, then report the exception E.
+            globalThis.reportError(e);
+          }
+        };
+        subscriber.signal.addEventListener("abort", abortCallbackWrapped, { once: true });
 
         // 8.3: Let sourceObserver be a new internal observer, initialized as follows:
-        const sourceObserver = {
+        const sourceObserver = new InternalObserver({
           next(value) {
             // next steps
             // 8.3.next.1: If next callback is not null, then invoke next callback with the passed in value.
@@ -550,9 +540,7 @@ const [Observable, Subscriber] = (() => {
               } catch (e) {
                 // If an exception E was thrown, then:
                 // 8.3.next.1.1: Remove abort callback from subscriber’s subscription controller’s signal.
-                if (abortCallback !== null) {
-                  subscriber.signal.removeEventListener("abort", abortCallback);
-                }
+                subscriber.signal.removeEventListener("abort", abortCallbackWrapped);
                 // 8.3.next.1.2: Run subscriber’s `error()` method, given E, and abort these steps.
                 subscriber.error(e);
                 return;
@@ -564,9 +552,7 @@ const [Observable, Subscriber] = (() => {
           error(error) {
             // error steps
             // 8.3.error.1: Remove abort callback from subscriber’s subscription controller’s signal.
-            if (abortCallback !== null) {
-              subscriber.signal.removeEventListener("abort", abortCallback);
-            }
+            subscriber.signal.removeEventListener("abort", abortCallbackWrapped);
             // 8.3.error.2: If error callback is not null, then invoke error callback given the passed in error.
             if (errorCallback !== null) {
               try {
@@ -583,9 +569,7 @@ const [Observable, Subscriber] = (() => {
           complete() {
             // complete steps
             // 8.3.complete.1: Remove abort callback from subscriber’s subscription controller’s signal.
-            if (abortCallback !== null) {
-              subscriber.signal.removeEventListener("abort", abortCallback);
-            }
+            subscriber.signal.removeEventListener("abort", abortCallbackWrapped);
             // 8.3.complete.2: If complete callback is not null, then invoke complete callback.
             if (completeCallback !== null) {
               try {
@@ -599,12 +583,12 @@ const [Observable, Subscriber] = (() => {
             // 8.3.complete.3: Run subscriber’s `complete()` method.
             subscriber.complete();
           },
-        };
+        });
 
         // 8.4: Let options be a new `SubscribeOptions` whose `signal` is subscriber’s subscription controller’s signal.
         const options = { signal: subscriber.signal };
         // 8.5: Subscribe to sourceObservable given sourceObserver and options.
-        sourceObservable.subscribe(sourceObserver, options);
+        subscribeTo(sourceObservable, sourceObserver, options);
       });
     }
 
