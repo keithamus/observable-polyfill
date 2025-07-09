@@ -712,6 +712,7 @@ const [Observable, Subscriber] = (() => {
             // 1. If remaining is > 0, then decrement remaining and abort these steps.
             if (remaining > 0) return (remaining -= 1);
             // 2. Assert: remaining is 0.
+            if (remaining != 0) return;
             // 3. Run subscriber’s next() method with the passed in value.
             subscriber.next(value);
           },
