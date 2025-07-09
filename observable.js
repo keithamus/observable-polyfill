@@ -750,16 +750,14 @@ const [Observable, Subscriber] = (() => {
         // 2.3. Let queue be a new list of any values, initially empty.
         let queue = [];
 
+        // https://wicg.github.io/observable/#flatmap-process-next-value-steps
+        // The flatmap process next value steps, given an any value, a
+        // Subscriber subscriber, a Mapper mapper, and references to all
+        // of the following: a list of any values queue, a boolean
+        // activeInnerSubscription, a boolean outerSubscriptionHasCompleted,
+        // and an unsigned long long idx:
         function flatmapProcessNextValueSteps(value) {
-          // https://wicg.github.io/observable/#flatmap-process-next-value-steps
-          //  The flatmap process next value steps, given an any value, a
-          //  Subscriber subscriber, a Mapper mapper, and references to all
-          //  of the following: a list of any values queue, a boolean
-          //  activeInnerSubscription, a boolean outerSubscriptionHasCompleted,
-          //  and an unsigned long long idx:
-          //
-          // 1. Let mappedResult be the result of invoking mapper with value
-          // and idx.
+          // 1. Let mappedResult be the result of invoking mapper with value, idx and "rethrow".
           let mappedResult;
           try {
             mappedResult = mapper(value, idx);
@@ -785,7 +783,7 @@ const [Observable, Subscriber] = (() => {
               // Run subscriber’s error() method, given the passed in error.
               subscriber.error(value);
             },
-            complete(value) {
+            complete() {
               // 1. If queue is not empty, then:
               if (queue.length) {
                 // 1.1. Let nextValue be the first item in queue; remove remove this item from queue.
@@ -808,13 +806,14 @@ const [Observable, Subscriber] = (() => {
         }
 
         // 2.4. Let activeInnerSubscription be a boolean, initially false.
+        let activeInnerSubscription = false;
         // 2.5. Let sourceObserver be a new internal observer, initialized as follows:
         let sourceObserver = new InternalObserver({
           next(value) {
             // 1. If activeInnerSubscription is true, then:
             if (activeInnerSubscription) {
               // 1.1. Append value to queue.
-              queue.shift(value);
+              queue.push(value);
               // 2. Otherwise:
             } else {
               // 2.1. Set activeInnerSubscription to true.
@@ -831,13 +830,17 @@ const [Observable, Subscriber] = (() => {
             subscriber.error(value);
           },
           complete() {
-            // Run subscriber’s complete() method.
-            subscriber.complete();
+            // 1. Set outerSubscriptionHasCompleted to true.
+            outerSubscriptionHasCompleted = true;
+            // 2. If activeInnerSubscription is false and queue is empty, run subscriber’s complete() method.
+            if (!activeInnerSubscription && !queue.length) {
+              subscriber.complete();
+            }
           },
         });
-        // 3. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller's signal.
-        let options = { signal: subscriber.signal };
-        // 4. Subscribe to sourceObservable given sourceObserver and options.
+        // 2.6. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller’s signal.
+        const options = { signal: subscriber.signal };
+        // 2.7. Subscribe to sourceObservable given sourceObserver and options.
         subscribeTo(sourceObservable, sourceObserver, options);
       });
     }
