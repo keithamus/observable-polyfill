@@ -8,6 +8,8 @@ const [Observable, Subscriber] = (() => {
 
   const noop = () => {};
 
+  const reportError = "reportError" in globalThis && globalThis.reportError || console.error;
+
   const privateState = new WeakMap();
 
   class InternalObserver {
@@ -147,15 +149,24 @@ const [Observable, Subscriber] = (() => {
 
       if (!arguments.length) throw new TypeError("too few arguments");
 
-      // 1. If this's active is false, then return.
-      if (!privateState.has(this)) return;
+      // 1. If this’s active is false, report an exception with error and this’s relevant global object, then return.
+      if (!privateState.has(this)) {
+        reportError(error);
+        return;
+      };
+
+      // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+      if (globalThis.Window && globalThis instanceof Window && !document?.isConnected) {
+        return;
+      }
 
       let observer = privateState.get(this).observer;
 
       // 3. Close this.
       closeASubscription(this);
 
-      // 4. Run this's error algorithm given error.
+      // 4. For each observer of this’s internal observers:
+      // 4.1. Run observer’s error steps given error.
       observer.error(error);
     }
 
@@ -532,7 +543,7 @@ const [Observable, Subscriber] = (() => {
                 abortCallback(subscriber.signal.reason);
               } catch (e) {
                 // If an exception E was thrown, then report the exception E.
-                console.error(e);
+                reportError(e);
               }
             },
             { once: true },
