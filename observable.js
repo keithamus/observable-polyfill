@@ -971,6 +971,75 @@ const [Observable, Subscriber] = (() => {
       });
     }
 
+    // https://wicg.github.io/observable/#dom-observable-catch
+    catch(callback) {
+      if (!(this instanceof Observable))
+        throw new TypeError("illegal invocation");
+      if (typeof callback !== "function")
+        throw new TypeError(`Parameter 1 is not of type 'Function'`);
+      // 1. Let sourceObservable be this.
+      const sourceObservable = this;
+      // 2. Let observable be a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
+      const observable = new Observable((subscriber) => {
+        // 2.1 Let sourceObserver be a new internal observer, initialized as follows:
+        const sourceObserver = new InternalObserver({
+          next(value) {
+            // 2.1.next Run subscriber’s next() method, given the passed in value.
+            subscriber.next(value);
+          },
+          error(value) {
+            // 2.1.error.1 Invoke callback with «the passed in error» and "rethrow". Let result be the returned value.
+            // If an exception E was thrown, then run subscriber’s error() with E, and abort these steps.
+            let result;
+            try {
+              result = callback(value);
+            } catch (error) {
+              subscriber.error(error);
+              return;
+            }
+            // 2.1.error.2 Let innerObservable be the result of calling from() with result.
+            // If an exception E was thrown, then run subscriber’s error() method, given E, and abort these steps.
+            let innerObservable;
+            try {
+              innerObservable = Observable.from(result);
+            } catch (error) {
+              subscriber.error(error);
+              return;
+            }
+            // 2.1.error.3 Let innerObserver be a new internal observer, initialized as follows:
+            const innerObserver = new InternalObserver({
+              next(value) {
+                // Run subscriber’s next() method, given the passed in value.
+                subscriber.next(value);
+              },
+              error(error) {
+                // Run subscriber’s error() method, given the passed in error.
+                subscriber.error(error);
+              },
+              complete() {
+                // Run subscriber’s complete() method.
+                subscriber.complete();
+              },
+            });
+            // 2.1.error.4 Let innerOptions be a new SubscribeOptions whose signal is subscriber’s subscription controller’s signal.
+            const innerOptions = { signal: subscriber.signal };
+            // 2.1.error.5 Subscribe to innerObservable given innerObserver and innerOptions.
+            subscribeTo(innerObservable, innerObserver, innerOptions);
+          },
+          complete() {
+            // 2.1.complete Run subscriber’s complete() method.
+            subscriber.complete();
+          },
+        });
+        // 2.2. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller’s signal.
+        const options = { signal: subscriber.signal };
+        // 2.3. Subscribe to sourceObservable given sourceObserver and options.
+        subscribeTo(sourceObservable, sourceObserver, options);
+      });
+      // 3. Return observable.
+      return observable;
+    }
+
     // https://pr-preview.s3.amazonaws.com/WICG/observable/pull/153.html#dom-observable-finally
     finally(callback) {
       if (!(this instanceof Observable))
