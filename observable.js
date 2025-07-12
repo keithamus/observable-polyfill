@@ -1040,7 +1040,7 @@ const [Observable, Subscriber] = (() => {
       return observable;
     }
 
-    // https://pr-preview.s3.amazonaws.com/WICG/observable/pull/153.html#dom-observable-finally
+    // https://wicg.github.io/observable/#dom-observable-finally
     finally(callback) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
@@ -1051,37 +1051,24 @@ const [Observable, Subscriber] = (() => {
       // 2. Let observable be a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
       // 3. Return observable.
       return new Observable((subscriber) => {
-        // 2.1. Let finally callback steps be the following steps:
-        function finallyCallback() {
-          // 2.1.1. Invoke callback.
-          try {
-            callback();
-          } catch (e) {
-            subscriber.error(e);
-          }
-        }
-        // 2.2. Add the algorithm finally callback steps to subscriber’s signal.
-        subscriber.signal.addEventListener("abort", finallyCallback);
-        // 3. Let sourceObserver be a new internal observer, initialized as follows:
-        let sourceObserver = new InternalObserver({
+        // 2.1. Run subscriber’s addTeardown() method with callback.
+        subscriber.addTeardown(callback);
+        // 2.2. Let sourceObserver be a new internal observer, initialized as follows:
+        const sourceObserver = new InternalObserver({
           next(value) {
             // Run subscriber’s next() method, given the passed in value.
             subscriber.next(value);
           },
           error(value) {
-            // 1. Run the finally callback steps.
-            finallyCallback();
-            // 2. Run subscriber’s error() method, given the passed in error.
+            // Run subscriber’s error() method, given the passed in error.
             subscriber.error(value);
           },
           complete() {
-            // 1. Run the finally callback steps.
-            finallyCallback();
-            // 2. Run subscriber’s complete() method.
-            subscriber.complete(value);
+            // Run subscriber’s complete() method.
+            subscriber.complete();
           },
         });
-        // 3. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller's signal.
+        // 3. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller’s signal.
         let options = { signal: subscriber.signal };
         // 4. Subscribe to sourceObservable given sourceObserver and options.
         subscribeTo(sourceObservable, sourceObserver, options);
