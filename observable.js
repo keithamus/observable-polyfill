@@ -8,6 +8,8 @@ const [Observable, Subscriber] = (() => {
 
   const noop = () => {};
 
+  const reportError = "reportError" in globalThis && globalThis.reportError || console.error;
+
   const privateState = new WeakMap();
 
   class InternalObserver {
@@ -147,15 +149,24 @@ const [Observable, Subscriber] = (() => {
 
       if (!arguments.length) throw new TypeError("too few arguments");
 
-      // 1. If this's active is false, then return.
-      if (!privateState.has(this)) return;
+      // 1. If this’s active is false, report an exception with error and this’s relevant global object, then return.
+      if (!privateState.has(this)) {
+        reportError(error);
+        return;
+      };
+
+      // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+      if (globalThis.Window && globalThis instanceof Window && !document?.isConnected) {
+        return;
+      }
 
       let observer = privateState.get(this).observer;
 
       // 3. Close this.
       closeASubscription(this);
 
-      // 4. Run this's error algorithm given error.
+      // 4. For each observer of this’s internal observers:
+      // 4.1. Run observer’s error steps given error.
       observer.error(error);
     }
 
@@ -524,7 +535,7 @@ const [Observable, Subscriber] = (() => {
             }
           } catch (e) {
             // If an exception E was thrown, then report the exception E.
-            globalThis.reportError(e);
+            reportError(e);
           }
         };
         subscriber.signal.addEventListener("abort", abortCallbackWrapped, { once: true });
@@ -944,7 +955,76 @@ const [Observable, Subscriber] = (() => {
       });
     }
 
-    // https://pr-preview.s3.amazonaws.com/WICG/observable/pull/153.html#dom-observable-finally
+    // https://wicg.github.io/observable/#dom-observable-catch
+    catch(callback) {
+      if (!(this instanceof Observable))
+        throw new TypeError("illegal invocation");
+      if (typeof callback !== "function")
+        throw new TypeError(`Parameter 1 is not of type 'Function'`);
+      // 1. Let sourceObservable be this.
+      const sourceObservable = this;
+      // 2. Let observable be a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
+      const observable = new Observable((subscriber) => {
+        // 2.1 Let sourceObserver be a new internal observer, initialized as follows:
+        const sourceObserver = new InternalObserver({
+          next(value) {
+            // 2.1.next Run subscriber’s next() method, given the passed in value.
+            subscriber.next(value);
+          },
+          error(value) {
+            // 2.1.error.1 Invoke callback with «the passed in error» and "rethrow". Let result be the returned value.
+            // If an exception E was thrown, then run subscriber’s error() with E, and abort these steps.
+            let result;
+            try {
+              result = callback(value);
+            } catch (error) {
+              subscriber.error(error);
+              return;
+            }
+            // 2.1.error.2 Let innerObservable be the result of calling from() with result.
+            // If an exception E was thrown, then run subscriber’s error() method, given E, and abort these steps.
+            let innerObservable;
+            try {
+              innerObservable = Observable.from(result);
+            } catch (error) {
+              subscriber.error(error);
+              return;
+            }
+            // 2.1.error.3 Let innerObserver be a new internal observer, initialized as follows:
+            const innerObserver = new InternalObserver({
+              next(value) {
+                // Run subscriber’s next() method, given the passed in value.
+                subscriber.next(value);
+              },
+              error(error) {
+                // Run subscriber’s error() method, given the passed in error.
+                subscriber.error(error);
+              },
+              complete() {
+                // Run subscriber’s complete() method.
+                subscriber.complete();
+              },
+            });
+            // 2.1.error.4 Let innerOptions be a new SubscribeOptions whose signal is subscriber’s subscription controller’s signal.
+            const innerOptions = { signal: subscriber.signal };
+            // 2.1.error.5 Subscribe to innerObservable given innerObserver and innerOptions.
+            subscribeTo(innerObservable, innerObserver, innerOptions);
+          },
+          complete() {
+            // 2.1.complete Run subscriber’s complete() method.
+            subscriber.complete();
+          },
+        });
+        // 2.2. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller’s signal.
+        const options = { signal: subscriber.signal };
+        // 2.3. Subscribe to sourceObservable given sourceObserver and options.
+        subscribeTo(sourceObservable, sourceObserver, options);
+      });
+      // 3. Return observable.
+      return observable;
+    }
+
+    // https://wicg.github.io/observable/#dom-observable-finally
     finally(callback) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
@@ -955,37 +1035,24 @@ const [Observable, Subscriber] = (() => {
       // 2. Let observable be a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
       // 3. Return observable.
       return new Observable((subscriber) => {
-        // 2.1. Let finally callback steps be the following steps:
-        function finallyCallback() {
-          // 2.1.1. Invoke callback.
-          try {
-            callback();
-          } catch (e) {
-            subscriber.error(e);
-          }
-        }
-        // 2.2. Add the algorithm finally callback steps to subscriber’s signal.
-        subscriber.signal.addEventListener("abort", finallyCallback);
-        // 3. Let sourceObserver be a new internal observer, initialized as follows:
-        let sourceObserver = new InternalObserver({
+        // 2.1. Run subscriber’s addTeardown() method with callback.
+        subscriber.addTeardown(callback);
+        // 2.2. Let sourceObserver be a new internal observer, initialized as follows:
+        const sourceObserver = new InternalObserver({
           next(value) {
             // Run subscriber’s next() method, given the passed in value.
             subscriber.next(value);
           },
           error(value) {
-            // 1. Run the finally callback steps.
-            finallyCallback();
-            // 2. Run subscriber’s error() method, given the passed in error.
+            // Run subscriber’s error() method, given the passed in error.
             subscriber.error(value);
           },
           complete() {
-            // 1. Run the finally callback steps.
-            finallyCallback();
-            // 2. Run subscriber’s complete() method.
-            subscriber.complete(value);
+            // Run subscriber’s complete() method.
+            subscriber.complete();
           },
         });
-        // 3. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller's signal.
+        // 3. Let options be a new SubscribeOptions whose signal is subscriber’s subscription controller’s signal.
         let options = { signal: subscriber.signal };
         // 4. Subscribe to sourceObservable given sourceObserver and options.
         subscribeTo(sourceObservable, sourceObserver, options);
