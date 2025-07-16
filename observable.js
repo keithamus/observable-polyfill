@@ -8,6 +8,8 @@ const [Observable, Subscriber] = (() => {
 
   const noop = () => {};
 
+  const isDocumentInactive = () => globalThis.Window && globalThis instanceof Window && !document?.isConnected;
+
   const reportError = "reportError" in globalThis && globalThis.reportError || console.error;
 
   const privateState = new WeakMap();
@@ -36,30 +38,35 @@ const [Observable, Subscriber] = (() => {
 
   // https://wicg.github.io/observable/#close-a-subscription
   function closeASubscription(subscriber, reason) {
-    // 1. If subscriber’s active is false, then return.
-    if (!privateState.has(subscriber)) return;
-
     const state = privateState.get(subscriber);
-    // 2. Set subscriber’s active boolean to false.
-    privateState.delete(subscriber);
+    
+    // 1. If subscriber’s active is false, then return.
+    if (!state?.active) return;
 
-    // 3. Signal abort subscriber’s subscription controller with reason, if it
-    // is given.
+    // 2. Set subscriber’s active boolean to false.
+    state.active = false;
+
+    // 3. Signal abort subscriber’s subscription controller with reason, if it is given.
     state.subscriptionController.abort(reason);
 
-    // 4. For each teardown of subscriber’s teardown callbacks sorted in
-    // reverse insertion order:
+    // 4. For each teardown of subscriber’s teardown callbacks sorted in reverse insertion order:
     for (const teardown of state.teardowns.reverse()) {
-      // 4.1. If subscriber’s relevant global object is a Window object, and
-      // its associated Document is not fully active, then abort these steps.
-
+      // 4.1. If subscriber’s relevant global object is a Window object, and its associated Document is not fully active, then abort these steps.
+      if (isDocumentInactive()) return;
       // 4.2. Invoke teardown.
-      teardown();
+      try {
+        teardown();
+      } catch (e) {
+        reportError(e);
+      }
     }
   }
 
   // https://wicg.github.io/observable/#observable-subscribe-to-an-observable
   function subscribeTo(observable, observer, options = {}) {
+    // 1. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+    if (isDocumentInactive()) return;
+
     // 2. Let internal observer be a new internal observer.
     let internalObserver;
 
@@ -123,7 +130,8 @@ const [Observable, Subscriber] = (() => {
         throw new TypeError("Illegal constructor");
       }
       privateState.set(this, {
-        observer: internalObserver,
+        active: true,
+        observers: new Set([internalObserver]),
         teardowns: [],
         subscriptionController: new AbortController(),
       });
@@ -135,11 +143,19 @@ const [Observable, Subscriber] = (() => {
         throw new TypeError("illegal invocation");
       if (!arguments.length) throw new TypeError("too few arguments");
 
-      // 1. If this's active is false, then return.
-      if (!privateState.has(this)) return;
+      const state = privateState.get(this);
 
-      // 3. Run this's next algorithm given value.
-      privateState.get(this).observer.next(value);
+      // 1. If this's active is false, then return.
+      if (!state?.active) return;
+
+      // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+      if (isDocumentInactive()) return;
+
+      // 3. For each observer of this’s internal observers:
+      for (const observer of state.observers) {
+        // 3.1. Run observer’s next steps given value.
+        observer.next(value);
+      }
     }
 
     // https://wicg.github.io/observable/#dom-subscriber-error
@@ -149,25 +165,25 @@ const [Observable, Subscriber] = (() => {
 
       if (!arguments.length) throw new TypeError("too few arguments");
 
+      const state = privateState.get(this);
+
       // 1. If this’s active is false, report an exception with error and this’s relevant global object, then return.
-      if (!privateState.has(this)) {
+      if (!state?.active) {
         reportError(error);
         return;
       };
 
       // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
-      if (globalThis.Window && globalThis instanceof Window && !document?.isConnected) {
-        return;
-      }
-
-      let observer = privateState.get(this).observer;
+      if (isDocumentInactive()) return;
 
       // 3. Close this.
-      closeASubscription(this);
+      closeASubscription(this, error);
 
       // 4. For each observer of this’s internal observers:
-      // 4.1. Run observer’s error steps given error.
-      observer.error(error);
+      for (const observer of state.observers) {
+        // 4.1. Run observer’s error steps given error.
+        observer.error(error);
+      }
     }
 
     // https://wicg.github.io/observable/#dom-subscriber-complete
@@ -175,16 +191,22 @@ const [Observable, Subscriber] = (() => {
       if (!(this instanceof Subscriber))
         throw new TypeError("illegal invocation");
 
-      // 1. If this's active is false, then return.
-      if (!privateState.has(this)) return;
+      const state = privateState.get(this);
 
-      let observer = privateState.get(this).observer;
+      // 1. If this's active is false, then return.
+      if (!state?.active) return;
+
+      // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+      if (isDocumentInactive()) return;
 
       // 3. Close this.
       closeASubscription(this);
 
-      // 4. Run this's complete algorithm.
-      observer.complete();
+      // 4. For each observer of this’s internal observers:
+      for (const observer of state.observers) {
+        // 4.1. Run observer’s complete steps.
+        observer.complete();
+      }
     }
 
     // https://wicg.github.io/observable/#dom-subscriber-addteardown
@@ -195,9 +217,14 @@ const [Observable, Subscriber] = (() => {
       if (typeof teardown != "function") {
         throw new TypeError(`Parameter 1 is not of type 'Function'`);
       }
+
+      // 1. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
+      if (isDocumentInactive()) return;
+
       // 2. If this's active is true, then append teardown to this's teardown callbacks list.
-      if (privateState.has(this))
-        privateState.get(this).teardowns.push(teardown);
+      const state = privateState.get(this);
+      if (state?.active)
+        state.teardowns.push(teardown);
       // 3. Otherwise, invoke teardown.
       else teardown();
     }
@@ -206,7 +233,7 @@ const [Observable, Subscriber] = (() => {
       if (!(this instanceof Subscriber))
         throw new TypeError("illegal invocation");
 
-      return privateState.has(this);
+      return !!privateState.get(this)?.active;
     }
 
     get signal() {
@@ -215,7 +242,7 @@ const [Observable, Subscriber] = (() => {
 
       if (!privateState.has(this)) {
         const controller = new AbortController();
-        controller.abort(); // TODO we need the reason here - how to get it without subscriptionController?
+        controller.abort();
         return controller.signal;
       }
       return privateState.get(this).subscriptionController.signal;
@@ -336,8 +363,9 @@ const [Observable, Subscriber] = (() => {
           // 6.7. Add the following abort algorithm to subscriber’s subscription controller’s signal:
           subscriber.signal.addEventListener("abort", () => {
             // 6.7.1. Run AsyncIteratorClose(iteratorRecord, NormalCompletion(subscriber’s subscription controller’s abort reason)).
-            const returnResult = iteratorRecord.return?.(subscriber.signal.reason);
-            if (iteratorRecord.return && (returnResult === null || typeof returnResult !== "object")) {
+            if (typeof iteratorRecord.return !== "function") return;
+            const returnResult = iteratorRecord.return(subscriber.signal.reason);
+            if (returnResult === null || typeof returnResult !== "object") {
                 throw new TypeError("Iterator .return() must return an Object");
             }
           });
@@ -370,8 +398,9 @@ const [Observable, Subscriber] = (() => {
           // 8.6. Add the following abort algorithm to subscriber’s subscription controller’s signal:
           subscriber.signal.addEventListener("abort", () => {
             // 8.6.1. Run IteratorClose(iteratorRecord, NormalCompletion(UNUSED)).
-            const returnResult = iteratorRecord.return?.();
-            if (iteratorRecord.return && (returnResult === null || typeof returnResult !== "object")) {
+            if (typeof iteratorRecord.return !== "function") return;
+            const returnResult = iteratorRecord.return();
+            if (returnResult === null || typeof returnResult !== "object") {
               throw new TypeError("Iterator .return() must return an Object");
             }
           });
