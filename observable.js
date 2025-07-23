@@ -1531,11 +1531,11 @@ const [Observable, Subscriber] = (() => {
           try {
             passed = predicate(value, idx);
           } catch (e) {
-            // If an exception E was thrown, then reject p with E, and signal abort visitor callback controller with E.
+            // If an exception E was thrown, then reject p with E, and signal abort controller with E.
             reject(e);
             controller.abort(e);
           }
-          // 2. Increment idx.
+          // 2. Set idx to idx + 1.
           idx += 1;
           // 3. If passed is true, then resolve p with true, and signal abort controller.
           if (passed) {
@@ -1552,9 +1552,9 @@ const [Observable, Subscriber] = (() => {
           resolve(false);
         },
       });
-      // 5. Subscribe to this given observer and options.
-      subscribeTo(this, observer, options);
-      // 6. Return p.
+      // 8. Subscribe to this given observer and internal options.
+      subscribeTo(this, observer, internalOptions);
+      // 9. Return p.
       return p;
     }
 
