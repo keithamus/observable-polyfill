@@ -1349,13 +1349,14 @@ const [Observable, Subscriber] = (() => {
           reject(error);
         },
         complete() {
-          // Resolve p with true.
-          resolve(true);
+          // Reject p with a new RangeError.
+          // Note: This is only reached when the source Observable completes before it emits a single value.
+          reject(new RangeError('No values in Observable'));
         },
       });
-      // 5. Subscribe to this given observer and options.
-      subscribeTo(this, observer, options);
-      // 6. Return p.
+      // 7. Subscribe to this given internal observer and internal options.
+      subscribeTo(this, observer, internalOptions);
+      // 8. Return p.
       return p;
     }
 
