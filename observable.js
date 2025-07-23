@@ -1461,7 +1461,7 @@ const [Observable, Subscriber] = (() => {
             reject(e);
             controller.abort(e);
           }
-          // 2. Increment idx.
+          // 2. Set idx to idx + 1.
           idx += 1;
           // 3. If passed is true, then resolve p with value, and signal abort controller.
           if (passed) {
@@ -1478,9 +1478,9 @@ const [Observable, Subscriber] = (() => {
           resolve();
         },
       });
-      // 5. Subscribe to this given observer and options.
-      subscribeTo(this, observer, options);
-      // 6. Return p.
+      // 8. Subscribe to this given observer and internal options.
+      subscribeTo(this, observer, internalOptions);
+      // 9. Return p.
       return p;
     }
 
