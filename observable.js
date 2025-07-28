@@ -278,7 +278,7 @@ const [Observable, Subscriber] = (() => {
       // 3. Let asyncIteratorMethodRecord be GetMethod(value, %Symbol.asyncIterator%).
       const asyncIteratorMethodRecord = Symbol.asyncIterator in value && value[Symbol.asyncIterator];
       // 4. If asyncIteratorMethod’s is undefined or null, then jump to the step labeled From iterable.
-      if (asyncIteratorMethodRecord) {
+      if (typeof asyncIteratorMethodRecord === "function") {
         // 5. Let nextAlgorithm be the following steps, given a Subscriber subscriber and an Iterator Record iteratorRecord:
         function nextAlgorithm(subscriber, iteratorRecord) {
           // 5.1. If subscriber’s subscription controller’s signal is aborted, then return.
@@ -373,7 +373,7 @@ const [Observable, Subscriber] = (() => {
       // 7. From iterable: Let iteratorMethod be ? GetMethod(value, %Symbol.iterator%).
       let iteratorMethod = Symbol.iterator in value && value[Symbol.iterator];
       // 8. If iteratorMethod is undefined, then jump to the step labeled From Promise.
-      if (iteratorMethod) {
+      if (typeof iteratorMethod === "function") {
         // Otherwise, return a new Observable whose subscribe callback is an algorithm that takes a Subscriber subscriber and does the following:
         return new Observable((subscriber) => {
           // 8.1. If subscriber’s subscription controller’s signal is aborted, then return.
