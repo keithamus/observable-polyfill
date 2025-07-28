@@ -1222,9 +1222,9 @@ const [Observable, Subscriber] = (() => {
           resolve();
         },
       });
-      // 5. Subscribe to this given observer and options.
-      subscribeTo(this, observer, options);
-      // 6. Return p.
+      // 8. Subscribe to this given observer and internal options.
+      subscribeTo(this, observer, internalOptions);
+      // 9. Return p.
       return p;
     }
 
