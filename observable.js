@@ -113,28 +113,69 @@ const [Observable, Subscriber] = (() => {
       internalObserver = observer || new InternalObserver();
     }
 
-    // 5. Let subscriber be a new Subscriber, initialized as...
-    const subscriber = new Subscriber(internalObserver);
+    const observableState = privateState.get(observable);
 
-    // 6. If options’s signal exists, then:
-    if ("signal" in options) {
-      // 6.1. If options’s signal is aborted, then close subscriber.
-      if (options.signal.aborted)
-        closeASubscription(subscriber, options.signal.reason);
-      // 6.2. Otherwise, add the following abort algorithm to options’s signal:
-      else
-        options.signal.addEventListener("abort", () =>
-          // 6.2.1 Close subscriber.
-          closeASubscription(subscriber, options.signal.reason),
-        );
+    // 5. If this’s weak subscriber is not null and this’s weak subscriber’s active is true:
+    const existingSubscriber = observableState.weakSubscriber?.deref();
+    if (existingSubscriber?.active) {
+      // 5.1. Let subscriber be this’s weak subscriber.
+      const subscriber = existingSubscriber;
+      const subscriberState = privateState.get(subscriber);
+      // 5.2. Append internal observer to subscriber’s internal observers.
+      subscriberState.observers.add(internalObserver);
+      // 5.3. If options’s signal exists, then:
+      if (options.signal) {
+        // 5.3.1 If options’s signal is aborted, then remove internal observer from subscriber’s internal observers.
+        if (options.signal.aborted) subscriberState.observers.delete(internalObserver);
+        // 5.3.2 Otherwise, add the following abort algorithm to options’s signal:
+        else options.signal.addEventListener("abort", () => {
+          const subscriberState = privateState.get(subscriber);
+          // 5.3.2.1 If subscriber’s active is false, then abort these steps.
+          if (!subscriberState?.active) return;
+          // 5.3.2.2 Remove internal observer from subscriber’s internal observers.
+          subscriberState.observers.delete(internalObserver);
+          // 5.3.2.3 If subscriber’s internal observers is empty, then close subscriber with options’s signal’s abort reason.
+          if (subscriberState.observers.size == 0) {
+            closeASubscription(subscriber, options.signal.reason);
+          }
+        });
+      }
+      // 5.4. return
+      return;
     }
 
-    const subscribe = privateState.get(observable);
+    // 6. Let subscriber be a new Subscriber.
+    // 7. Append internal observer to subscriber’s internal observers.
+    const subscriber = new Subscriber(internalObserver);
+
+    // 8. Set this’s weak subscriber to subscriber.
+    observableState.weakSubscriber = new WeakRef(subscriber);
+
+    // 9. If options’s signal exists, then:
+    if ("signal" in options) {
+      // 9.1. If options’s signal is aborted, then close subscriber given options’s signal abort reason.
+      if (options.signal.aborted)
+        closeASubscription(subscriber, options.signal.reason);
+      // 9.2. Otherwise, add the following abort algorithm to options’s signal:
+      else
+        options.signal.addEventListener("abort", () => {
+          const subscriberState = privateState.get(subscriber);
+          // 9.2.1. If subscriber’s active is false, then abort these steps.
+          if (!subscriberState?.active) return;
+          // 9.2.2. Remove internal observer from subscriber’s internal observers.
+          subscriberState.observers.delete(internalObserver);
+          // 9.2.3. If subscriber’s internal observers is empty, then close subscriber with options’s signal’s abort reason.
+          if (subscriberState.observers.size == 0) {
+            closeASubscription(subscriber, options.signal.reason);
+          }
+        });
+    }
+
     // 7. If observable's subscribe callback is a SubscribeCallback, invoke it with subscriber.
-    if (subscribe) {
+    if (observableState.subscribeCallback) {
       // If an exception E was thrown, call subscriber’s error() method with E.
       try {
-        subscribe(subscriber);
+        observableState.subscribeCallback(subscriber);
       } catch (e) {
         subscriber.error(e);
       }
@@ -287,11 +328,14 @@ const [Observable, Subscriber] = (() => {
     }
 
     // https://wicg.github.io/observable/#dom-observable-observable
-    constructor(subscriberCallback) {
-      if (!subscriberCallback) {
+    constructor(subscribeCallback) {
+      if (!subscribeCallback) {
         throw new TypeError("1 argument required but 0 present");
       }
-      privateState.set(this, subscriberCallback);
+      privateState.set(this, {
+        weakSubscriber: null,
+        subscribeCallback,
+      });
     }
 
     // https://wicg.github.io/observable/#observable-from
