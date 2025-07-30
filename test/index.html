@@ -2,8 +2,26 @@
 <html>
   <head>
     <script type="module">
+      // apply the observable polyfill to the main document
+      // for all tests which directly run in the main document
       import { apply } from "../observable.js";
       apply();
+      // apply the observable polyfill to all iframes created by the wpt
+      // by monkey-patching document.createElement - this way the tests can be kept unmodified
+      const originalCreateElement = document.createElement;
+      document.createElement = function (tagName, options) {
+        const element = originalCreateElement.call(document, tagName, options);
+        if (tagName.toLowerCase() === 'iframe') {
+          element.setAttribute("srcdoc", `
+            <!doctype html>
+            <script type="module">
+              import { apply } from "../observable.js";
+              apply();
+            <\/script>
+          `);
+        }
+        return element;
+      }
     </script>
     <script defer src="./wpt/testharness.js"></script>
     <script defer src="./wpt/testharnessreport.js"></script>
