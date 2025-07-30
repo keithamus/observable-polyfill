@@ -1,3 +1,15 @@
+// getting a reference of some used global objects as globalThis is getting undefined when a iframe is removed
+const { AbortController, AbortSignal, WeakMap, WeakRef, Window, reportError = console.log } = globalThis;
+
+// https://html.spec.whatwg.org/multipage/document-sequences.html#fully-active
+// A Document d is said to be fully active when d is the active document of
+// a navigable navigable, and either navigable is a top-level traversable or
+// navigable's container document is fully active.
+const isDocumentFullyActive = (d) => d && d.defaultView !== null && d.defaultView.document === d && (d.defaultView.top === d.defaultView || isDocumentFullyActive(d.defaultView.parent.document));
+
+// check if we run in a browser
+const isBrowserContext = () => !!Window && globalThis instanceof Window;
+
 const [Observable, Subscriber] = (() => {
   function enumerate(obj, key, enumerable = true) {
     Object.defineProperty(obj, key, {
@@ -5,12 +17,6 @@ const [Observable, Subscriber] = (() => {
       enumerable,
     });
   }
-
-  const noop = () => {};
-
-  const isDocumentInactive = () => globalThis.Window && globalThis instanceof Window && !document?.isConnected;
-
-  const reportError = "reportError" in globalThis && globalThis.reportError || console.error;
 
   const anySignal = (signalArray) => {
     // remove null or undefined signals, simplifies usage of anySignal
@@ -76,7 +82,7 @@ const [Observable, Subscriber] = (() => {
     // 4. For each teardown of subscriber’s teardown callbacks sorted in reverse insertion order:
     for (const teardown of state.teardowns.reverse()) {
       // 4.1. If subscriber’s relevant global object is a Window object, and its associated Document is not fully active, then abort these steps.
-      if (isDocumentInactive()) return;
+      if (isBrowserContext() && !isDocumentFullyActive(document)) return;
       // 4.2. Invoke teardown.
       try {
         teardown();
@@ -89,7 +95,7 @@ const [Observable, Subscriber] = (() => {
   // https://wicg.github.io/observable/#observable-subscribe-to-an-observable
   function subscribeTo(observable, observer, options = {}) {
     // 1. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
-    if (isDocumentInactive()) return;
+    if (isBrowserContext() && !isDocumentFullyActive(document)) return;
 
     // 2. Let internal observer be a new internal observer.
     let internalObserver;
@@ -214,7 +220,7 @@ const [Observable, Subscriber] = (() => {
       if (!state?.active) return;
 
       // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
-      if (isDocumentInactive()) return;
+      if (isBrowserContext() && !isDocumentFullyActive(document)) return;
 
       // 3. For each observer of this’s internal observers:
       for (const observer of state.observers) {
@@ -239,7 +245,7 @@ const [Observable, Subscriber] = (() => {
       };
 
       // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
-      if (isDocumentInactive()) return;
+      if (isBrowserContext() && !isDocumentFullyActive(document)) return;
 
       // 3. Close this.
       closeASubscription(this, error);
@@ -262,7 +268,7 @@ const [Observable, Subscriber] = (() => {
       if (!state?.active) return;
 
       // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
-      if (isDocumentInactive()) return;
+      if (isBrowserContext() && !isDocumentFullyActive(document)) return;
 
       // 3. Close this.
       closeASubscription(this);
@@ -284,7 +290,7 @@ const [Observable, Subscriber] = (() => {
       }
 
       // 1. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
-      if (isDocumentInactive()) return;
+      if (isBrowserContext() && !isDocumentFullyActive(document)) return;
 
       // 2. If this's active is true, then append teardown to this's teardown callbacks list.
       const state = privateState.get(this);
@@ -1712,9 +1718,7 @@ function apply() {
 
   EventTarget.prototype.when = function (type, options = {}) {
     // Step 1: If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
-    if (globalThis.Window && this instanceof Window && !document?.isConnected) {
-      return; // Early return if Document isn’t fully active
-    }
+    if (isBrowserContext() && !isDocumentFullyActive(document)) return;
 
     // Step 2: Let event target be this.
     const eventTarget = this;
