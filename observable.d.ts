@@ -86,9 +86,19 @@ export class Observable<T = any> {
     options?: SubscribeOptions
   ): Promise<T | undefined>;
   some(predicate: Predicate<T>, options?: SubscribeOptions): Promise<boolean>;
+  reduce(
+    reducer: Reducer<T, T>,
+    initialValue?: undefined,
+    options?: SubscribeOptions
+  ): Promise<T | undefined>;
+  reduce(
+    reducer: Reducer<T, T>,
+    initialValue: T,
+    options?: SubscribeOptions
+  ): Promise<T>;
   reduce<R>(
     reducer: Reducer<T, R>,
-    initialValue?: R,
+    initialValue: R,
     options?: SubscribeOptions
   ): Promise<R>;
 }
