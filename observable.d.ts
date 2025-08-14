@@ -77,6 +77,10 @@ export class Observable<T = any> {
   every(predicate: Predicate<T>, options?: SubscribeOptions): Promise<boolean>;
   first(options?: SubscribeOptions): Promise<T>;
   last(options?: SubscribeOptions): Promise<T>;
+  find<U extends T>(
+    predicate: TypePredicate<T, U>,
+    options?: SubscribeOptions
+  ): Promise<U | undefined>;
   find(
     predicate: Predicate<T>,
     options?: SubscribeOptions
