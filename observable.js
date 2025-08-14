@@ -10,6 +10,8 @@ const isDocumentFullyActive = (d) => d && d.defaultView !== null && d.defaultVie
 // check if we run in a browser
 const isBrowserContext = () => !!Window && globalThis instanceof Window;
 
+const unset = Symbol("unset");
+
 const [Observable, Subscriber] = (() => {
   function enumerate(obj, key, enumerable = true) {
     Object.defineProperty(obj, key, {
@@ -1641,13 +1643,13 @@ const [Observable, Subscriber] = (() => {
       // 6. Let idx be an unsigned long long, initially 0.
       let idx = 0;
       // 7. Let accumulator be initialValue if it is given, and uninitialized otherwise.
-      let accumulator = initialValue;
+      let accumulator = arguments.length > 1 ? initialValue : unset;
       // 8. Let observer be a new internal observer, initialized as follows:
       const observer = new InternalObserver({
         // next steps
         next(value) {
           // 8.1 If accumulator is uninitialized (meaning no initialValue was passed in), then set accumulator to the passed in value, set idx to idx + 1, and abort these steps.
-          if (accumulator === undefined) {
+          if (accumulator === unset) {
             accumulator = value;
             idx++;
             return;
@@ -1675,7 +1677,7 @@ const [Observable, Subscriber] = (() => {
         complete() {
           // 1. If accumulator is not "unset", then resolve p with accumulator.
           // Otherwise, reject p with a TypeError.
-          if (accumulator !== undefined) {
+          if (accumulator !== unset) {
             resolve(accumulator);
           } else {
             reject(new TypeError('no initial value provided and no values emitted'));
