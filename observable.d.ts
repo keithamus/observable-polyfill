@@ -49,7 +49,7 @@ export type Reducer<T = any, R = any> = (
 ) => R;
 export type Mapper<T = any, R = any> = (value: T, index: number) => R;
 export type Visitor<T = any> = (value: T, index: number) => void;
-export type CatchCallback<R = any> = (value: any) => Observable<R> | R;
+export type CatchCallback<R = any> = (value: any) => ObservableInput<R>;
 
 export type ObservableInput<T> =
   | Observable<T>

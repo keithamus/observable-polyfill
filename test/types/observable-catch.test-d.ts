@@ -1,28 +1,51 @@
-import { describe, it, expectTypeOf } from "vitest";
-import { stringObservable } from "./__fixtures__";
+import { describe, it, test, expectTypeOf } from "vitest";
+import { count, numberObservable, stringObservable } from "./__fixtures__";
 
 describe("Observable.catch", () => {
   it("requires a callback", () => {
     // @ts-expect-error
     expectTypeOf(stringObservable.catch).toBeCallableWith();
-    expectTypeOf(stringObservable.catch).toBeCallableWith(() => {});
+    expectTypeOf(stringObservable.catch).toBeCallableWith(
+      () => numberObservable
+    );
   });
 
-  it("infers caught error type", () => {
+  it("infers correct callback parameters", () => {
     stringObservable.catch((error) => {
       expectTypeOf(error).toBeAny();
+      return numberObservable;
     });
   });
 
-  it("infers new Observable type when returning a plain value", () => {
-    expectTypeOf(stringObservable.catch(() => 2)).toEqualTypeOf<
-      Observable<string | number>
-    >();
+  it("requires the callback to return an ObservableInput", () => {
+    // @ts-expect-error
+    expectTypeOf(stringObservable.catch).toBeCallableWith(() => {});
+    // @ts-expect-error
+    expectTypeOf(stringObservable.catch).toBeCallableWith(() => 1);
   });
 
-  it("infers new Observable type when returning an Observable", () => {
-    expectTypeOf(
-      stringObservable.catch(() => new Observable<number>(() => {}))
-    ).toEqualTypeOf<Observable<string | number>>();
+  describe("it infers Observable type", () => {
+    test("from an Observable", () => {
+      expectTypeOf(
+        stringObservable.catch(() => numberObservable)
+      ).toEqualTypeOf<Observable<string | number>>();
+    });
+
+    test("from an AsyncIterable", () => {
+      expectTypeOf(stringObservable.catch(() => count())).toEqualTypeOf<
+        Observable<string | number>
+      >();
+    });
+
+    test("from an Iterable", () => {
+      expectTypeOf(stringObservable.catch(() => [1, 2, 3])).toEqualTypeOf<
+        Observable<string | number>
+      >();
+    });
+    test("from a Promise", () => {
+      expectTypeOf(
+        stringObservable.catch(() => Promise.resolve(1))
+      ).toEqualTypeOf<Observable<string | number>>();
+    });
   });
 });
