@@ -70,7 +70,7 @@ export class Observable<T = any> {
   flatMap<R>(mapper: Mapper<T, ObservableInput<R>>): Observable<R>;
   switchMap<R>(mapper: Mapper<T, ObservableInput<R>>): Observable<R>;
   inspect(inspectorUnion?: ObservableInspectorUnion<T>): Observable<T>;
-  catch(callback: CatchCallback): Observable<T>;
+  catch<R>(callback: CatchCallback<R>): Observable<T | R>;
   finally(callback: () => void): Observable<T>;
   toArray(options?: SubscribeOptions): Promise<T[]>;
   forEach(callback: Visitor<T>, options?: SubscribeOptions): Promise<void>;
