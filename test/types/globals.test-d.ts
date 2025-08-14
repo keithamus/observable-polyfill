@@ -7,14 +7,17 @@ describe("Globals", () => {
     expectTypeOf(Observable).toEqualTypeOf<typeof observable.Observable>();
     expectTypeOf<Observable>().toEqualTypeOf<observable.Observable>();
   });
+
   it("registers global ObservableEventListenerOptions type", () => {
     expectTypeOf<ObservableEventListenerOptions>().toEqualTypeOf<observable.ObservableEventListenerOptions>();
   });
+
   it("augments EventTarget with when()", () => {
     expectTypeOf<EventTarget>().toHaveProperty("when");
     const target = new EventTarget();
     expectTypeOf(target.when("foo")).toEqualTypeOf<Observable<Event>>();
   });
+
   it("augments Document with when(), including specific types", () => {
     expectTypeOf<Document>().toHaveProperty("when");
     expectTypeOf(document.when("click")).toEqualTypeOf<
@@ -22,13 +25,17 @@ describe("Globals", () => {
     >();
     expectTypeOf(document.when("foo")).toEqualTypeOf<Observable<Event>>();
   });
+
   it("augments HTMLElement with when(), including specific types", () => {
     expectTypeOf<HTMLElement>().toHaveProperty("when");
-    expectTypeOf(document.body.when("click")).toEqualTypeOf<
+    expectTypeOf(document.documentElement.when("click")).toEqualTypeOf<
       Observable<PointerEvent>
     >();
-    expectTypeOf(document.body.when("foo")).toEqualTypeOf<Observable<Event>>();
+    expectTypeOf(document.documentElement.when("foo")).toEqualTypeOf<
+      Observable<Event>
+    >();
   });
+
   it("augments Element with when(), including specific types", () => {
     expectTypeOf<Element>().toHaveProperty("when");
     const el = new Element();
@@ -37,6 +44,7 @@ describe("Globals", () => {
     >();
     expectTypeOf(el.when("foo")).toEqualTypeOf<Observable<Event>>();
   });
+
   it("augments Window with when(), including specific types", () => {
     expectTypeOf<Window>().toHaveProperty("when");
     expectTypeOf(window.when("click")).toEqualTypeOf<
