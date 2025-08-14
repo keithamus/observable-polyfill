@@ -14,22 +14,22 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./observable.d.ts",
+      "types": "./index.d.ts",
       "import": "./index.js",
       "browser": "./observable.min.js",
       "require": "./observable.min.js"
     },
     "./fn": {
-      "types": "./index-fn.d.ts",
+      "types": "./observable.d.ts",
       "import": "./observable.js"
     }
   },
   "main": "index.js",
-  "types": "observable.d.ts",
+  "types": "index.d.ts",
   "typesVersions": {
     "*": {
       "fn": [
-        "./index-fn.d.ts"
+        "./observable.d.ts"
       ]
     }
   },
