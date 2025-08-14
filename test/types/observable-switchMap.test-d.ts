@@ -5,8 +5,17 @@ describe("Observable.switchMap", () => {
   it("requires a callback", () => {
     // @ts-expect-error
     expectTypeOf(stringObservable.switchMap).toBeCallableWith();
+    // @ts-expect-error
+    expectTypeOf(stringObservable.switchMap).toBeCallableWith(() => {});
+    // @ts-expect-error
+    expectTypeOf(stringObservable.switchMap).toBeCallableWith(() => 1);
     expectTypeOf(stringObservable.switchMap).toBeCallableWith(
-      () => stringObservable
+      () => numberObservable
+    );
+    expectTypeOf(stringObservable.switchMap).toBeCallableWith(() => count());
+    expectTypeOf(stringObservable.switchMap).toBeCallableWith(() => [1, 2, 3]);
+    expectTypeOf(stringObservable.switchMap).toBeCallableWith(() =>
+      Promise.resolve(1)
     );
   });
 

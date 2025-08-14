@@ -5,6 +5,8 @@ describe("Observable.from", () => {
   it("requires an ObservableInput", () => {
     // @ts-expect-error
     expectTypeOf(Observable.from).toBeCallableWith();
+    // @ts-expect-error
+    expectTypeOf(Observable.from).toBeCallableWith(1);
     expectTypeOf(Observable.from).toBeCallableWith(numberObservable);
     expectTypeOf(Observable.from).toBeCallableWith(count());
     expectTypeOf(Observable.from).toBeCallableWith([1, 2, 3]);

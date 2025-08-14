@@ -2,11 +2,20 @@ import { describe, it, test, expectTypeOf } from "vitest";
 import { count, numberObservable, stringObservable } from "./__fixtures__";
 
 describe("Observable.flatMap", () => {
-  it("requires a callback", () => {
+  it("requires a callback returning an ObservableInput", () => {
     // @ts-expect-error
     expectTypeOf(stringObservable.flatMap).toBeCallableWith();
+    // @ts-expect-error
+    expectTypeOf(stringObservable.flatMap).toBeCallableWith(() => {});
+    // @ts-expect-error
+    expectTypeOf(stringObservable.flatMap).toBeCallableWith(() => 1);
     expectTypeOf(stringObservable.flatMap).toBeCallableWith(
-      () => stringObservable
+      () => numberObservable
+    );
+    expectTypeOf(stringObservable.flatMap).toBeCallableWith(() => count());
+    expectTypeOf(stringObservable.flatMap).toBeCallableWith(() => [1, 2, 3]);
+    expectTypeOf(stringObservable.flatMap).toBeCallableWith(() =>
+      Promise.resolve(1)
     );
   });
 
