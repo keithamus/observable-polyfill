@@ -174,6 +174,19 @@ describe("Globals", () => {
       Whenable<XMLHttpRequestEventTargetEventMap>
     >();
   });
+
+  it("correctly infers specific events where possible", () => {
+    expectTypeOf(document.when("click")).toEqualTypeOf<
+      Observable<PointerEvent>
+    >();
+    expectTypeOf(cookieStore.when("change")).toEqualTypeOf<
+      Observable<CookieChangeEvent>
+    >();
+    expectTypeOf(new XMLHttpRequest().when("load")).toEqualTypeOf<
+      Observable<ProgressEvent<XMLHttpRequestEventTarget>>
+    >();
+  });
+
   it("registers global when() function", () => {
     expectTypeOf(when).toBeCallableWith("foo");
     expectTypeOf(when).toBeCallableWith("foo", {});
