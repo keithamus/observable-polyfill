@@ -53,10 +53,10 @@ declare global {
   }
 
   interface Window {
-    when<T extends keyof HTMLElementEventMap>(
+    when<T extends keyof WindowEventMap>(
       event: T,
       options?: ObservableEventListenerOptions
-    ): Observable<HTMLElementEventMap[T]>;
+    ): Observable<WindowEventMap[T]>;
     when(
       type: string,
       options?: ObservableEventListenerOptions

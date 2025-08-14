@@ -41,9 +41,13 @@
     "minify": "esbuild --bundle --minify index.js > observable.min.js",
     "prepublishOnly": "npm run minify",
     "test": "echo TODO! Run ./wpt serve --inject-script=../observables-polyfill/observable.js for now.",
-    "test-serve": "npx http-server -c1 -t0 --cors --gzip --brotli -o test ."
+    "test-serve": "npx http-server -c1 -t0 --cors --gzip --brotli -o test .",
+    "test:types": "vitest run"
   },
   "devDependencies": {
-    "esbuild": "^0.25.2"
-  }
+    "esbuild": "^0.25.2",
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "npm@11.5.2+sha512.aac1241cfc3f41dc38780d64295c6c6b917a41e24288b33519a7b11adfc5a54a5f881c642d7557215b6c70e01e55655ed7ba666300fd0238bc75fb17478afaf3"
 }

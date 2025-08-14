@@ -49,7 +49,7 @@ export type Reducer<T = any, R = any> = (
 ) => R;
 export type Mapper<T = any, R = any> = (value: T, index: number) => R;
 export type Visitor<T = any> = (value: T, index: number) => void;
-export type CatchCallback<R = any> = (value: any) => Observable<R> | R;
+export type CatchCallback<R = any> = (value: any) => ObservableInput<R>;
 
 export type ObservableInput<T> =
   | Observable<T>
@@ -70,21 +70,35 @@ export class Observable<T = any> {
   flatMap<R>(mapper: Mapper<T, ObservableInput<R>>): Observable<R>;
   switchMap<R>(mapper: Mapper<T, ObservableInput<R>>): Observable<R>;
   inspect(inspectorUnion?: ObservableInspectorUnion<T>): Observable<T>;
-  catch(callback: CatchCallback): Observable<T>;
+  catch<R>(callback: CatchCallback<R>): Observable<T | R>;
   finally(callback: () => void): Observable<T>;
   toArray(options?: SubscribeOptions): Promise<T[]>;
   forEach(callback: Visitor<T>, options?: SubscribeOptions): Promise<void>;
   every(predicate: Predicate<T>, options?: SubscribeOptions): Promise<boolean>;
   first(options?: SubscribeOptions): Promise<T>;
   last(options?: SubscribeOptions): Promise<T>;
+  find<U extends T>(
+    predicate: TypePredicate<T, U>,
+    options?: SubscribeOptions
+  ): Promise<U | undefined>;
   find(
     predicate: Predicate<T>,
     options?: SubscribeOptions
   ): Promise<T | undefined>;
   some(predicate: Predicate<T>, options?: SubscribeOptions): Promise<boolean>;
+  reduce(
+    reducer: Reducer<T, T>,
+    initialValue?: undefined,
+    options?: SubscribeOptions
+  ): Promise<T | undefined>;
+  reduce(
+    reducer: Reducer<T, T>,
+    initialValue: T,
+    options?: SubscribeOptions
+  ): Promise<T>;
   reduce<R>(
     reducer: Reducer<T, R>,
-    initialValue?: R,
+    initialValue: R,
     options?: SubscribeOptions
   ): Promise<R>;
 }
