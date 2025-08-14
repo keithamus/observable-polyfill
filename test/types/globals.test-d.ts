@@ -1,4 +1,3 @@
-import "observable-polyfill";
 import * as observable from "observable-polyfill";
 import { describe, it, expectTypeOf } from "vitest";
 
