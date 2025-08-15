@@ -20,12 +20,8 @@ const [Observable, Subscriber] = (() => {
     });
   }
 
-  const anySignal = (signalArray) => {
-    // remove null or undefined signals, simplifies usage of anySignal
-    const signals = signalArray.filter(Boolean);
-    // if AbortSignal.any() is available, use it.
-    if ("any" in AbortSignal) return AbortSignal.any(signals);
-    // otherwise, create a signal that will abort when any of the signals aborts.
+  const abortSignalAny = "any" in AbortSignal ? AbortSignal.any.bind(AbortSignal) : (signals) => {
+    // create a signal that will abort when any of the signals aborts.
     const ac = new AbortController();
     // when any of the signals is already aborted, abort ac immediately and return its signal.
     for (const signal of signals) {
@@ -43,6 +39,9 @@ const [Observable, Subscriber] = (() => {
     // return the signal.
     return ac.signal;
   };
+
+  // wrapper for AbortSignal.any that removes null and undefined, for convenience.
+  const anySignal = (signalArray) => abortSignalAny(signalArray.filter(Boolean));
 
   const pWithResolvers = 'withResolvers' in Promise ? Promise.withResolvers.bind(Promise) : () => {
     let resolve, reject;
