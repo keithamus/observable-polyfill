@@ -44,6 +44,12 @@ const [Observable, Subscriber] = (() => {
     return ac.signal;
   };
 
+  const pWithResolvers = 'withResolvers' in Promise ? Promise.withResolvers.bind(Promise) : () => {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+    return { promise, resolve, reject };
+  }
+
   const privateState = new WeakMap();
 
   class InternalObserver {
@@ -1213,9 +1219,8 @@ const [Observable, Subscriber] = (() => {
     toArray(options = {}) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
-      let resolve, reject;
       // 1. Let p a new promise.
-      let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. If options’s signal is not null:
       if (options.signal) {
         // 2.1. If options’s signal is aborted, then:
@@ -1259,9 +1264,8 @@ const [Observable, Subscriber] = (() => {
         throw new TypeError("illegal invocation");
       if (typeof callback !== "function")
         throw new TypeError(`Parameter 1 is not of type 'Function'`);
-      let resolve, reject;
       // 1. Let p a new promise.
-      let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. Let visitor callback controller be a new AbortController.
       let visitorCallbackController = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
@@ -1319,9 +1323,8 @@ const [Observable, Subscriber] = (() => {
         throw new TypeError("illegal invocation");
       if (typeof predicate !== "function")
         throw new TypeError(`Parameter 1 is not of type 'Function'`);
-      let resolve, reject;
       // 1. Let p a new promise.
-      let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. Let controller be a new AbortController.
       let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
@@ -1383,9 +1386,8 @@ const [Observable, Subscriber] = (() => {
     first(options = {}) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
-      let resolve, reject;
       // 1. Let p a new promise.
-      let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. Let controller be a new AbortController.
       let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
@@ -1433,9 +1435,8 @@ const [Observable, Subscriber] = (() => {
     last(options = {}) {
       if (!(this instanceof Observable))
         throw new TypeError("illegal invocation");
-      let resolve, reject;
       // 1. Let p a new promise.
-      let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. If options’s signal is not null:
       if (options.signal) {
         // 2.1. If options’s signal is aborted, then:
@@ -1486,9 +1487,8 @@ const [Observable, Subscriber] = (() => {
         throw new TypeError("illegal invocation");
       if (typeof predicate !== "function")
         throw new TypeError(`Parameter 1 is not of type 'Function'`);
-      let resolve, reject;
       // 1. Let p a new promise.
-      let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. Let controller be a new AbortController.
       let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
@@ -1552,9 +1552,8 @@ const [Observable, Subscriber] = (() => {
         throw new TypeError("illegal invocation");
       if (typeof predicate !== "function")
         throw new TypeError(`Parameter 1 is not of type 'Function'`);
-      let resolve, reject;
       // 1. Let p a new promise.
-      let p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. Let controller be a new AbortController.
       let controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
@@ -1618,9 +1617,8 @@ const [Observable, Subscriber] = (() => {
         throw new TypeError("illegal invocation");
       if (typeof reducer !== "function")
         throw new TypeError(`Parameter 1 is not of type 'Function'`);
-      let resolve, reject;
       // 1. Let p a new promise.
-      const p = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+      let { promise: p, resolve, reject } = pWithResolvers();
       // 2. Let controller be a new AbortController.
       const controller = new AbortController();
       // 3. Let internal options be a new SubscribeOptions whose signal is the
