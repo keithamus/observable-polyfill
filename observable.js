@@ -44,10 +44,7 @@ const [Observable, Subscriber] = (() => {
     return ac.signal;
   };
 
-  const pWithResolvers = () => {
-    // if Promise.withResolvers() is available, use it.
-    if ("withResolvers" in Promise) return Promise.withResolvers();
-    // otherwise, create a promise with resolvers.
+  const pWithResolvers = 'withResolvers' in Promise ? Promise.withResolvers.bind(Promise) : () => {
     let resolve, reject;
     const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
     return { promise, resolve, reject };
