@@ -420,6 +420,7 @@ const [Observable, Subscriber] = (() => {
       const asyncIteratorMethodRecord = Symbol.asyncIterator in value && value[Symbol.asyncIterator];
       // 4. If asyncIteratorMethod’s is undefined or null, then jump to the step labeled From iterable.
       if (typeof asyncIteratorMethodRecord === "function") {
+        let done = false;
         // 5. Let nextAlgorithm be the following steps, given a Subscriber subscriber and an Iterator Record iteratorRecord:
         function nextAlgorithm(subscriber, iteratorRecord) {
           // 5.1. If subscriber’s subscription controller’s signal is aborted, then return.
@@ -446,10 +447,9 @@ const [Observable, Subscriber] = (() => {
                 subscriber.error(new TypeError("Not an IteratorResult."));
                 return;
               }
-              let done;
               try {
                 // 5.6.2 Let done be IteratorComplete(iteratorResult).
-                done = iteratorResult.done;
+                ({ done } = iteratorResult);
               } catch (error) {
                 // 5.6.3 If done is a throw completion, then run subscriber’s error() method with done’s [[Value]] and abort these steps.
                 subscriber.error(error);
@@ -501,7 +501,7 @@ const [Observable, Subscriber] = (() => {
           // 6.7. Add the following abort algorithm to subscriber’s subscription controller’s signal:
           subscriber.signal.addEventListener("abort", () => {
             // 6.7.1. Run AsyncIteratorClose(iteratorRecord, NormalCompletion(subscriber’s subscription controller’s abort reason)).
-            if (typeof iteratorRecord.return !== "function") return;
+            if (typeof iteratorRecord.return !== "function" || done) return;
             const returnPromise = pTry(() => iteratorRecord.return(subscriber.signal.reason));
             returnPromise.then((result) => {
               if (result === null || typeof result !== "object") {
@@ -531,6 +531,7 @@ const [Observable, Subscriber] = (() => {
             subscriber.error(error);
             return;
           }
+          let done = false;
           // 8.4. Let iteratorRecord be ! iteratorRecordCompletion.
           let iteratorRecord = iteratorRecordCompletion;
           // 8.5 If subscriber’s subscription controller’s signal is aborted, then return.
@@ -538,7 +539,7 @@ const [Observable, Subscriber] = (() => {
           // 8.6. Add the following abort algorithm to subscriber’s subscription controller’s signal:
           subscriber.signal.addEventListener("abort", () => {
             // 8.6.1. Run IteratorClose(iteratorRecord, NormalCompletion(UNUSED)).
-            if (typeof iteratorRecord.return !== "function") return;
+            if (typeof iteratorRecord.return !== "function" || done) return;
             const returnResult = iteratorRecord.return();
             if (returnResult === null || typeof returnResult !== "object") {
               throw new TypeError("Iterator .return() must return an Object");
@@ -549,9 +550,10 @@ const [Observable, Subscriber] = (() => {
             try {
               // 8.7.1. Let next be IteratorStepValue(iteratorRecord).
               let next = iteratorRecord.next();
+              ({ done } = next);
               // 8.7.3. Set next to ! to next.
               // 8.7.4. If next is done, then:
-              if (next.done) {
+              if (done) {
                 // 8.7.4.1. Assert: iteratorRecord’s [[Done]] is true.
                 // 8.7.4.2. Run subscriber’s complete().
                 subscriber.complete();
