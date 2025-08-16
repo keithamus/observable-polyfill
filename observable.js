@@ -49,6 +49,8 @@ const [Observable, Subscriber] = (() => {
     return { promise, resolve, reject };
   }
 
+  const pTry = "try" in Promise ? Promise.try.bind(Promise) : (fn, ...args) => new Promise((r) => r(fn(...args)));
+
   const privateState = new WeakMap();
 
   class InternalObserver {
@@ -445,10 +447,12 @@ const [Observable, Subscriber] = (() => {
           subscriber.signal.addEventListener("abort", () => {
             // 6.7.1. Run AsyncIteratorClose(iteratorRecord, NormalCompletion(subscriber’s subscription controller’s abort reason)).
             if (typeof iteratorRecord.return !== "function") return;
-            const returnResult = iteratorRecord.return(subscriber.signal.reason);
-            if (returnResult === null || typeof returnResult !== "object") {
+            const returnPromise = pTry(() => iteratorRecord.return(subscriber.signal.reason));
+            returnPromise.then((result) => {
+              if (result === null || typeof result !== "object") {
                 throw new TypeError("Iterator .return() must return an Object");
-            }
+              }
+            });
           });
           // 6.8. Run nextAlgorithm given subscriber and iteratorRecord.
           nextAlgorithm(subscriber, iteratorRecord);
