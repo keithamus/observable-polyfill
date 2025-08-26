@@ -20,6 +20,113 @@ const [Observable, Subscriber] = (() => {
     });
   }
 
+  const pTry = "try" in Promise ? Promise.try.bind(Promise) : (fn, ...args) => new Promise((r) => r(fn(...args)));
+
+  const pWithResolvers = 'withResolvers' in Promise ? Promise.withResolvers.bind(Promise) : () => {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+    return { promise, resolve, reject };
+  }
+
+  function getIteratorFromMethod(obj, method) {
+    // 1. Let iterator be ? Call(method, obj).
+    const iterator = method.call(obj);
+    // 2. If iterator is not an Object, throw a TypeError exception.
+    if (iterator === null || typeof iterator !== "object") throw new TypeError("Iterator is not an object");
+    // 3. Return ? GetIteratorDirect(iterator)
+    return iterator;
+  }
+
+  const privateState = new WeakMap();
+
+  const AsyncFromSyncIteratorPrototype = {
+    next(...args) {
+      // 1. Let O be the this value.
+      const O = this;
+      // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+      const state = privateState.get(O);
+      if (!state?.syncIteratorRecord)
+        throw new TypeError(
+          "AsyncFromSyncIteratorPrototype.next called on invalid object"
+        );
+      // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+      const { syncIteratorRecord } = state;
+      return pTry(() => syncIteratorRecord.next(...args));
+    },
+    return(...args) {
+      // 1. Let O be the this value.
+      const O = this;
+      // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+      const state = privateState.get(O);
+      if (!state?.syncIteratorRecord)
+        throw new TypeError(
+          "AsyncFromSyncIteratorPrototype.return called on invalid object"
+        );
+      // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+      const { syncIteratorRecord } = state;
+      return pTry(() => {
+        if (!syncIteratorRecord.return) return { value: undefined, done: true };
+        return syncIteratorRecord.return(...args);
+      });
+    },
+    throw(...args) {
+      // 1. Let O be the this value.
+      const O = this;
+      // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+      const state = privateState.get(O);
+      if (!state?.syncIteratorRecord)
+        throw new TypeError(
+          "AsyncFromSyncIteratorPrototype.throw called on invalid object"
+        );
+      // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+      const { syncIteratorRecord } = state;
+      return pTry(() => {
+        if (!syncIteratorRecord.throw) {
+          // a. NOTE: If syncIterator does not have a throw method, close it to give it a chance to clean up before we reject the capability.
+          syncIteratorRecord.return();
+          throw new TypeError("no throw method");
+        }
+        return syncIteratorRecord.throw(...args);
+      });
+    },
+  };
+
+  function createAsyncFromSyncIterator(syncIteratorRecord) {
+    // 1. Let asyncIterator be OrdinaryObjectCreate(%AsyncFromSyncIteratorPrototype%, « [[SyncIteratorRecord]] »).
+    const asyncIterator = Object.create(AsyncFromSyncIteratorPrototype);
+    // 2. Set asyncIterator.[[SyncIteratorRecord]] to syncIteratorRecord.
+    privateState.set(asyncIterator, { syncIteratorRecord });
+    return asyncIterator;
+  }
+
+  function getIterator(obj, isAsync) {
+    let method = undefined;
+    // 1. if kind is ASYNC, then
+    if (isAsync) {
+      // 1.a. Let method be ? GetMethod(obj, %Symbol.asyncIterator%).
+      method = obj[Symbol.asyncIterator];
+      // 1.b. If method is undefined, then
+      if (method == undefined) {
+        // 1.b.i. Let method be ? GetMethod(obj, %Symbol.iterator%).
+        method = obj[Symbol.iterator];
+        // 1.b.ii. If method is undefined, throw a TypeError exception.
+        if (method == undefined) throw new TypeError("Object is not async iterable");
+        // 1.b.iii. Let syncIteratorRecord be ? GetIteratorFromMethod(obj, syncMethod).
+        const syncIteratorRecord = getIteratorFromMethod(obj, method);
+        // 1.b.iv. Return ! CreateAsyncFromSyncIterator(syncIteratorRecord).
+        return createAsyncFromSyncIterator(syncIteratorRecord);
+      }
+    // 2. Else,
+    } else {
+      // 2.a. Let method be ? GetMethod(obj, %Symbol.iterator%).
+      method = obj[Symbol.iterator];
+    }
+    // 3. If method is undefined, throw a TypeError exception.
+    if (method == undefined) throw new TypeError("Object is not iterable");
+    // 4. Return ? GetIteratorFromMethod(obj, method).
+    return getIteratorFromMethod(obj, method);
+  }
+
   const abortSignalAny = "any" in AbortSignal ? AbortSignal.any.bind(AbortSignal) : (signals) => {
     // create a signal that will abort when any of the signals aborts.
     const ac = new AbortController();
@@ -42,14 +149,6 @@ const [Observable, Subscriber] = (() => {
 
   // wrapper for AbortSignal.any that removes null and undefined, for convenience.
   const anySignal = (signalArray) => abortSignalAny(signalArray.filter(Boolean));
-
-  const pWithResolvers = 'withResolvers' in Promise ? Promise.withResolvers.bind(Promise) : () => {
-    let resolve, reject;
-    const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
-    return { promise, resolve, reject };
-  }
-
-  const privateState = new WeakMap();
 
   class InternalObserver {
     constructor({ next, error, complete } = {}) {
@@ -363,6 +462,7 @@ const [Observable, Subscriber] = (() => {
       const asyncIteratorMethodRecord = Symbol.asyncIterator in value && value[Symbol.asyncIterator];
       // 4. If asyncIteratorMethod’s is undefined or null, then jump to the step labeled From iterable.
       if (typeof asyncIteratorMethodRecord === "function") {
+        let done = false;
         // 5. Let nextAlgorithm be the following steps, given a Subscriber subscriber and an Iterator Record iteratorRecord:
         function nextAlgorithm(subscriber, iteratorRecord) {
           // 5.1. If subscriber’s subscription controller’s signal is aborted, then return.
@@ -389,10 +489,9 @@ const [Observable, Subscriber] = (() => {
                 subscriber.error(new TypeError("Not an IteratorResult."));
                 return;
               }
-              let done;
               try {
                 // 5.6.2 Let done be IteratorComplete(iteratorResult).
-                done = iteratorResult.done;
+                ({ done } = iteratorResult);
               } catch (error) {
                 // 5.6.3 If done is a throw completion, then run subscriber’s error() method with done’s [[Value]] and abort these steps.
                 subscriber.error(error);
@@ -430,7 +529,7 @@ const [Observable, Subscriber] = (() => {
           let iteratorRecordCompletion;
           try {
             // 6.2. Let iteratorRecordCompletion be GetIterator(value, async).
-            iteratorRecordCompletion = value[Symbol.asyncIterator]();
+            iteratorRecordCompletion = getIterator(value, true);
           } catch (error) {
             // 6.3. If iteratorRecordCompletion is a throw completion, then run subscriber’s error() method with iteratorRecordCompletion’s [[Value]] and abort these steps.
             subscriber.error(error);
@@ -444,11 +543,13 @@ const [Observable, Subscriber] = (() => {
           // 6.7. Add the following abort algorithm to subscriber’s subscription controller’s signal:
           subscriber.signal.addEventListener("abort", () => {
             // 6.7.1. Run AsyncIteratorClose(iteratorRecord, NormalCompletion(subscriber’s subscription controller’s abort reason)).
-            if (typeof iteratorRecord.return !== "function") return;
-            const returnResult = iteratorRecord.return(subscriber.signal.reason);
-            if (returnResult === null || typeof returnResult !== "object") {
+            if (typeof iteratorRecord.return !== "function" || done) return;
+            const returnPromise = pTry(() => iteratorRecord.return(subscriber.signal.reason));
+            returnPromise.then((result) => {
+              if (result === null || typeof result !== "object") {
                 throw new TypeError("Iterator .return() must return an Object");
-            }
+              }
+            });
           });
           // 6.8. Run nextAlgorithm given subscriber and iteratorRecord.
           nextAlgorithm(subscriber, iteratorRecord);
@@ -466,12 +567,13 @@ const [Observable, Subscriber] = (() => {
           let iteratorRecordCompletion;
           try {
             // 8.2. Let iteratorRecordCompletion be GetIterator(value, sync).
-            iteratorRecordCompletion = value[Symbol.iterator]();
+            iteratorRecordCompletion = getIterator(value, false);
           } catch (error) {
             // 8.3. If iteratorRecordCompletion is a throw completion, then run subscriber’s error() method, given iteratorRecordCompletion’s [[Value]], and abort these steps.
             subscriber.error(error);
             return;
           }
+          let done = false;
           // 8.4. Let iteratorRecord be ! iteratorRecordCompletion.
           let iteratorRecord = iteratorRecordCompletion;
           // 8.5 If subscriber’s subscription controller’s signal is aborted, then return.
@@ -479,7 +581,7 @@ const [Observable, Subscriber] = (() => {
           // 8.6. Add the following abort algorithm to subscriber’s subscription controller’s signal:
           subscriber.signal.addEventListener("abort", () => {
             // 8.6.1. Run IteratorClose(iteratorRecord, NormalCompletion(UNUSED)).
-            if (typeof iteratorRecord.return !== "function") return;
+            if (typeof iteratorRecord.return !== "function" || done) return;
             const returnResult = iteratorRecord.return();
             if (returnResult === null || typeof returnResult !== "object") {
               throw new TypeError("Iterator .return() must return an Object");
@@ -490,9 +592,10 @@ const [Observable, Subscriber] = (() => {
             try {
               // 8.7.1. Let next be IteratorStepValue(iteratorRecord).
               let next = iteratorRecord.next();
+              ({ done } = next);
               // 8.7.3. Set next to ! to next.
               // 8.7.4. If next is done, then:
-              if (next.done) {
+              if (done) {
                 // 8.7.4.1. Assert: iteratorRecord’s [[Done]] is true.
                 // 8.7.4.2. Run subscriber’s complete().
                 subscriber.complete();
