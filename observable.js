@@ -22,6 +22,12 @@ const [Observable, Subscriber] = (() => {
 
   const pTry = "try" in Promise ? Promise.try.bind(Promise) : (fn, ...args) => new Promise((r) => r(fn(...args)));
 
+  const pWithResolvers = 'withResolvers' in Promise ? Promise.withResolvers.bind(Promise) : () => {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
+    return { promise, resolve, reject };
+  }
+
   function getIteratorFromMethod(obj, method) {
     // 1. Let iterator be ? Call(method, obj).
     const iterator = method.call(obj);
@@ -31,21 +37,65 @@ const [Observable, Subscriber] = (() => {
     return iterator;
   }
 
+  const privateState = new WeakMap();
+
+  const AsyncFromSyncIteratorPrototype = {
+    next(...args) {
+      // 1. Let O be the this value.
+      const O = this;
+      // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+      const state = privateState.get(O);
+      if (!state?.syncIteratorRecord)
+        throw new TypeError(
+          "AsyncFromSyncIteratorPrototype.next called on invalid object"
+        );
+      // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+      const { syncIteratorRecord } = state;
+      return pTry(() => syncIteratorRecord.next(...args));
+    },
+    return(...args) {
+      // 1. Let O be the this value.
+      const O = this;
+      // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+      const state = privateState.get(O);
+      if (!state?.syncIteratorRecord)
+        throw new TypeError(
+          "AsyncFromSyncIteratorPrototype.return called on invalid object"
+        );
+      // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+      const { syncIteratorRecord } = state;
+      return pTry(() => {
+        if (!syncIteratorRecord.return) return { value: undefined, done: true };
+        return syncIteratorRecord.return(...args);
+      });
+    },
+    throw(...args) {
+      // 1. Let O be the this value.
+      const O = this;
+      // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+      const state = privateState.get(O);
+      if (!state?.syncIteratorRecord)
+        throw new TypeError(
+          "AsyncFromSyncIteratorPrototype.throw called on invalid object"
+        );
+      // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+      const { syncIteratorRecord } = state;
+      return pTry(() => {
+        if (!syncIteratorRecord.throw) {
+          // a. NOTE: If syncIterator does not have a throw method, close it to give it a chance to clean up before we reject the capability.
+          syncIteratorRecord.return();
+          throw new TypeError("no throw method");
+        }
+        return syncIteratorRecord.throw(...args);
+      });
+    },
+  };
+
   function createAsyncFromSyncIterator(syncIteratorRecord) {
-    const asyncIterator = {
-      next(value) {
-        return pTry(() => syncIteratorRecord.next(value));
-      },
-      [Symbol.asyncIterator]() {
-        return this;
-      },
-    };
-    if (typeof syncIteratorRecord.return === "function") {
-      asyncIterator.return = (value) => pTry(() => syncIteratorRecord.return(value));
-    }
-    if (typeof syncIteratorRecord.throw === "function") {
-      asyncIterator.throw = (exception) => pTry(() => syncIteratorRecord.throw(exception));
-    }
+    // 1. Let asyncIterator be OrdinaryObjectCreate(%AsyncFromSyncIteratorPrototype%, « [[SyncIteratorRecord]] »).
+    const asyncIterator = Object.create(AsyncFromSyncIteratorPrototype);
+    // 2. Set asyncIterator.[[SyncIteratorRecord]] to syncIteratorRecord.
+    privateState.set(asyncIterator, { syncIteratorRecord });
     return asyncIterator;
   }
 
@@ -99,14 +149,6 @@ const [Observable, Subscriber] = (() => {
 
   // wrapper for AbortSignal.any that removes null and undefined, for convenience.
   const anySignal = (signalArray) => abortSignalAny(signalArray.filter(Boolean));
-
-  const pWithResolvers = 'withResolvers' in Promise ? Promise.withResolvers.bind(Promise) : () => {
-    let resolve, reject;
-    const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
-    return { promise, resolve, reject };
-  }
-
-  const privateState = new WeakMap();
 
   class InternalObserver {
     constructor({ next, error, complete } = {}) {
