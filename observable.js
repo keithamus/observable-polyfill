@@ -99,10 +99,10 @@ const [Observable, Subscriber] = (() => {
     return asyncIterator;
   }
 
-  function getIterator(obj, kind = "SYNC") {
+  function getIterator(obj, isAsync) {
     let method = undefined;
     // 1. if kind is ASYNC, then
-    if (kind === "ASYNC") {
+    if (isAsync) {
       // 1.a. Let method be ? GetMethod(obj, %Symbol.asyncIterator%).
       method = obj[Symbol.asyncIterator];
       // 1.b. If method is undefined, then
@@ -529,7 +529,7 @@ const [Observable, Subscriber] = (() => {
           let iteratorRecordCompletion;
           try {
             // 6.2. Let iteratorRecordCompletion be GetIterator(value, async).
-            iteratorRecordCompletion = getIterator(value, "ASYNC");
+            iteratorRecordCompletion = getIterator(value, true);
           } catch (error) {
             // 6.3. If iteratorRecordCompletion is a throw completion, then run subscriber’s error() method with iteratorRecordCompletion’s [[Value]] and abort these steps.
             subscriber.error(error);
@@ -567,7 +567,7 @@ const [Observable, Subscriber] = (() => {
           let iteratorRecordCompletion;
           try {
             // 8.2. Let iteratorRecordCompletion be GetIterator(value, sync).
-            iteratorRecordCompletion = getIterator(value, "SYNC");
+            iteratorRecordCompletion = getIterator(value, false);
           } catch (error) {
             // 8.3. If iteratorRecordCompletion is a throw completion, then run subscriber’s error() method, given iteratorRecordCompletion’s [[Value]], and abort these steps.
             subscriber.error(error);
