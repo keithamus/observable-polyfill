@@ -328,8 +328,11 @@ const [Observable, Subscriber] = (() => {
       // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
       if (isBrowserContext() && !isDocumentFullyActive(document)) return;
 
-      // 3. For each observer of this’s internal observers:
-      for (const observer of state.observers) {
+      // 3. Let internal observers copy be a copy of this’s internal observers.
+      const internalObservers = new Set(state.observers);
+
+      // 4. For each observer of this’s internal observers copy:
+      for (const observer of internalObservers) {
         // 3.1. Run observer’s next steps given value.
         observer.next(value);
       }
@@ -356,9 +359,12 @@ const [Observable, Subscriber] = (() => {
       // 3. Close this.
       closeASubscription(this, error);
 
-      // 4. For each observer of this’s internal observers:
-      for (const observer of state.observers) {
-        // 4.1. Run observer’s error steps given error.
+      // 4. Let internal observers copy be a copy of this’s internal observers.
+      const internalObservers = new Set(state.observers);
+
+      // 5. For each observer of this’s internal observers copy:
+      for (const observer of internalObservers) {
+        // 5.1. Run observer’s error steps given error.
         observer.error(error);
       }
     }
@@ -379,9 +385,12 @@ const [Observable, Subscriber] = (() => {
       // 3. Close this.
       closeASubscription(this);
 
-      // 4. For each observer of this’s internal observers:
-      for (const observer of state.observers) {
-        // 4.1. Run observer’s complete steps.
+      // 4. Let internal observers copy be a copy of this’s internal observers.
+      const internalObservers = new Set(state.observers);
+
+      // 5. For each observer of this’s internal observers copy:
+      for (const observer of internalObservers) {
+        // 5.1. Run observer’s complete steps.
         observer.complete();
       }
     }
