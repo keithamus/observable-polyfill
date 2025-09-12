@@ -26,7 +26,7 @@ const [Observable, Subscriber] = (() => {
     let resolve, reject;
     const promise = new Promise((res, rej) => ((resolve = res), (reject = rej)));
     return { promise, resolve, reject };
-  }
+  };
 
   function getIteratorFromMethod(obj, method) {
     // 1. Let iterator be ? Call(method, obj).
@@ -351,7 +351,7 @@ const [Observable, Subscriber] = (() => {
       if (!state?.active) {
         reportError(error);
         return;
-      };
+      }
 
       // 2. If this’s relevant global object is a Window object, and its associated Document is not fully active, then return.
       if (isBrowserContext() && !isDocumentFullyActive(document)) return;
