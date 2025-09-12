@@ -919,11 +919,11 @@ declare global {
 
   // XMLHttpRequestUpload inherits from XMLHttpRequestEventTarget
 
-  declare function when<K extends keyof WindowEventMap>(
+  function when<K extends keyof WindowEventMap>(
     event: K,
     options?: ObservableEventListenerOptions
   ): Observable<WindowEventMap[K]>;
-  declare function when(
+  function when(
     type: string,
     options?: ObservableEventListenerOptions
   ): Observable<Event>;
