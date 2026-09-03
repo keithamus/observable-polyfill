@@ -7,8 +7,11 @@ const { AbortController, AbortSignal, WeakMap, WeakRef, Window, reportError = co
 // navigable's container document is fully active.
 const isDocumentFullyActive = (d) => d && d.defaultView !== null && d.defaultView.document === d && (d.defaultView.top === d.defaultView || isDocumentFullyActive(d.defaultView.parent.document));
 
-// check if we run in a browser
-const isBrowserContext = () => !!Window && globalThis instanceof Window;
+// check if we run in a browser. Deno also defines `Window` (and `globalThis` is an
+// instance of it) but has no `document`, so require one before treating the global
+// object as a browser Window — otherwise the fully-active checks below would throw
+// a ReferenceError on the bare `document` reference.
+const isBrowserContext = () => !!Window && globalThis instanceof Window && typeof globalThis.document !== "undefined";
 
 const unset = Symbol("unset");
 
